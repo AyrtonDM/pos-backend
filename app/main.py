@@ -40,7 +40,7 @@ app.include_router(sucursal_empresa_router)
 app.include_router(sucursal_router)
 app.include_router(invitacion_router)
 
-media_root = Path("media")
+media_root = Path(__file__).resolve().parent / "media"
 media_root.mkdir(parents=True, exist_ok=True)
 app.mount("/media", StaticFiles(directory=media_root), name="media")
 

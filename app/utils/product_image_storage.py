@@ -5,7 +5,7 @@ from fastapi import UploadFile
 
 
 def save_product_image(file: UploadFile, id_empresa: int) -> str:
-    media_root = Path("media")
+    media_root = Path(__file__).resolve().parent.parent / "media"
     relative_dir = Path("products") / f"empresa_{id_empresa}"
     target_dir = media_root / relative_dir
     target_dir.mkdir(parents=True, exist_ok=True)
