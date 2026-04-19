@@ -88,3 +88,11 @@ class UsuarioRepository:
         db.commit()
         db.refresh(usuario)
         return usuario
+
+    @staticmethod
+    def actualizar_contrasena(db: Session, usuario: Usuario, contrasena_hash: str) -> Usuario:
+        """Actualiza la contrasena del usuario."""
+        usuario.contrasena = contrasena_hash
+        db.commit()
+        db.refresh(usuario)
+        return usuario

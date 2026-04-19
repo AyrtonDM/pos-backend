@@ -1,7 +1,10 @@
 # -*- coding: utf-8 -*-
 from sqlalchemy.orm import Session
+from sqlalchemy.orm import joinedload
 
 from app.models.empresas import Empresa
+from app.models.usuarios import Usuario
+from app.models.usuarios.rol import Rol
 from app.models.usuarios.usuario_rol import UsuarioRol
 
 
@@ -10,7 +13,7 @@ class EmpresaRepository:
     def crear_empresa(db: Session, datos: dict) -> Empresa:
         empresa = Empresa(**datos)
         db.add(empresa)
-        db.commit()
+        db.flush()
         db.refresh(empresa)
         return empresa
 
@@ -31,7 +34,115 @@ class EmpresaRepository:
             activo=activo,
         )
         db.add(usuario_rol)
-        db.commit()
+        db.flush()
+        db.refresh(usuario_rol)
+        return usuario_rol
+
+    @staticmethod
+    def obtener_rol_por_nombre(db: Session, nombre: str) -> Rol | None:
+        return db.query(Rol).filter(Rol.nombre == nombre).first()
+
+    @staticmethod
+    def obtener_usuario_rol_sin_sucursal(
+        db: Session,
+        id_usuario: int,
+        id_empresa: int,
+    ) -> UsuarioRol | None:
+        return (
+            db.query(UsuarioRol)
+            .filter(
+                UsuarioRol.id_usuario == id_usuario,
+                UsuarioRol.id_empresa == id_empresa,
+                UsuarioRol.id_sucursal.is_(None),
+                UsuarioRol.activo.is_(True),
+            )
+            .first()
+        )
+
+    @staticmethod
+    def obtener_usuario_rol_activo(
+        db: Session,
+        id_usuario: int,
+        id_empresa: int,
+    ) -> UsuarioRol | None:
+        return (
+            db.query(UsuarioRol)
+            .filter(
+                UsuarioRol.id_usuario == id_usuario,
+                UsuarioRol.id_empresa == id_empresa,
+                UsuarioRol.activo.is_(True),
+            )
+            .first()
+        )
+
+    @staticmethod
+    def obtener_usuario_rol_por_sucursal_y_rol(
+        db: Session,
+        id_usuario: int,
+        id_empresa: int,
+        id_sucursal: int,
+        id_rol: int,
+    ) -> UsuarioRol | None:
+        return (
+            db.query(UsuarioRol)
+            .filter(
+                UsuarioRol.id_usuario == id_usuario,
+                UsuarioRol.id_empresa == id_empresa,
+                UsuarioRol.id_sucursal == id_sucursal,
+                UsuarioRol.id_rol == id_rol,
+                UsuarioRol.activo.is_(True),
+            )
+            .first()
+        )
+
+    @staticmethod
+    def obtener_usuarios_rol_por_sucursal_y_rol(
+        db: Session,
+        id_empresa: int,
+        id_sucursal: int,
+        id_rol: int,
+    ) -> list[UsuarioRol]:
+        return (
+            db.query(UsuarioRol)
+            .options(joinedload(UsuarioRol.usuario).joinedload(Usuario.persona))
+            .filter(
+                UsuarioRol.id_empresa == id_empresa,
+                UsuarioRol.id_sucursal == id_sucursal,
+                UsuarioRol.id_rol == id_rol,
+                UsuarioRol.activo.is_(True),
+            )
+            .all()
+        )
+
+    @staticmethod
+    def obtener_sucursales_empleado_por_usuario(
+        db: Session,
+        id_usuario: int,
+        id_rol: int,
+    ) -> list[UsuarioRol]:
+        return (
+            db.query(UsuarioRol)
+            .options(
+                joinedload(UsuarioRol.empresa),
+                joinedload(UsuarioRol.sucursal),
+            )
+            .filter(
+                UsuarioRol.id_usuario == id_usuario,
+                UsuarioRol.id_rol == id_rol,
+                UsuarioRol.id_sucursal.is_not(None),
+                UsuarioRol.activo.is_(True),
+            )
+            .all()
+        )
+
+    @staticmethod
+    def asignar_sucursal_a_usuario_rol(
+        db: Session,
+        usuario_rol: UsuarioRol,
+        id_sucursal: int,
+    ) -> UsuarioRol:
+        usuario_rol.id_sucursal = id_sucursal
+        db.flush()
         db.refresh(usuario_rol)
         return usuario_rol
 

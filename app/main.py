@@ -7,6 +7,11 @@ from app.models.empresas import Empresa, Sucursal
 from app.models.usuarios import Persona, Rol, Usuario, UsuarioRol
 from app.routers.empresa_router import router as empresa_router
 from app.routers.auth_router import router as auth_router
+from app.routers.sucursal_router import (
+    empresa_router as sucursal_empresa_router,
+    invitacion_router,
+    sucursal_router,
+)
 from app.seeds import run_seeds
 
 app = FastAPI(title="POS Backend")
@@ -25,6 +30,9 @@ app.add_middleware(
 
 app.include_router(auth_router)
 app.include_router(empresa_router)
+app.include_router(sucursal_empresa_router)
+app.include_router(sucursal_router)
+app.include_router(invitacion_router)
 
 @app.on_event("startup")
 def on_startup() -> None:

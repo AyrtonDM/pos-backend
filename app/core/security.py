@@ -2,6 +2,7 @@
 import os
 import hashlib
 import random
+import secrets
 import string
 from datetime import datetime, timedelta, timezone
 
@@ -118,6 +119,14 @@ def generate_verification_code(length: int = 6) -> str:
     """
     characters = string.ascii_letters + string.digits
     return "".join(random.choice(characters) for _ in range(length))
+
+
+def generate_temporary_password(length: int = 12) -> str:
+    """
+    Genera una contrasena temporal alfanumerica.
+    """
+    characters = string.ascii_letters + string.digits
+    return "".join(secrets.choice(characters) for _ in range(length))
 
 
 def hash_verification_code(code: str) -> str:

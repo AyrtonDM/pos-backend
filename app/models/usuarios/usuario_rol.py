@@ -9,7 +9,13 @@ from app.core.database import Base
 class UsuarioRol(Base):
     __tablename__ = "usuario_rol"
     __table_args__ = (
-        UniqueConstraint("id_usuario", "id_rol", "id_empresa", name="uq_usuario_rol"),
+        UniqueConstraint(
+            "id_usuario",
+            "id_rol",
+            "id_empresa",
+            "id_sucursal",
+            name="uq_usuario_rol_sucursal",
+        ),
     )
 
     id_usuario_rol = Column(Integer, primary_key=True, index=True)

@@ -32,3 +32,29 @@ def apply_schema_updates() -> None:
                 """
             )
         )
+        connection.execute(
+            text(
+                """
+                ALTER TABLE usuario_rol
+                DROP CONSTRAINT IF EXISTS uq_usuario_rol
+                """
+            )
+        )
+        connection.execute(
+            text(
+                """
+                DO $$
+                BEGIN
+                    IF NOT EXISTS (
+                        SELECT 1
+                        FROM pg_constraint
+                        WHERE conname = 'uq_usuario_rol_sucursal'
+                    ) THEN
+                        ALTER TABLE usuario_rol
+                        ADD CONSTRAINT uq_usuario_rol_sucursal
+                        UNIQUE (id_usuario, id_rol, id_empresa, id_sucursal);
+                    END IF;
+                END $$;
+                """
+            )
+        )
