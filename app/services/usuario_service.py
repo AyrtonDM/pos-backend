@@ -1,0 +1,133 @@
+# -*- coding: utf-8 -*-
+import os
+from datetime import datetime, timedelta
+from dotenv import load_dotenv
+from passlib.context import CryptContext
+from sqlalchemy.orm import Session
+
+from app.repositories.usuario_repository import UsuarioRepository
+from app.utils.security import generate_verification_code, hash_verification_code
+from app.utils.email_service import send_verification_email
+
+load_dotenv()
+
+pwd_context = CryptContext(schemes=["bcrypt_sha256"], deprecated="auto")
+
+
+class UsuarioService:
+    @staticmethod
+    def registrar_usuario(
+        db: Session,
+        email: str,
+        contrasena: str,
+        nombre_completo: str,
+        fecha_nacimiento,
+        genero: str,
+        telefono: str,
+        documento: str,
+    ) -> dict:
+        """
+        Registra un nuevo usuario:
+        1. Verifica que no exista otro usuario con el mismo email
+        2. Crea la persona y usuario
+        3. Genera codigo de verificacion
+        4. Envia email con el codigo
+        """
+        # Verificar que el email no exista
+        usuario_existente = UsuarioRepository.obtener_usuario_por_email(db, email)
+        if usuario_existente:
+            raise ValueError("El correo electronico ya esta registrado.")
+
+        # Hash la contrasena
+        contrasena_hash = pwd_context.hash(contrasena)
+
+        # Crear usuario y persona
+        usuario = UsuarioRepository.crear_usuario_con_persona(
+            db=db,
+            email=email,
+            contrasena_hash=contrasena_hash,
+            nombre_completo=nombre_completo,
+            fecha_nacimiento=fecha_nacimiento,
+            genero=genero,
+            telefono=telefono,
+            documento=documento,
+        )
+
+        # Generar codigo de verificacion
+        codigo = generate_verification_code(length=6)
+        codigo_hash = hash_verification_code(codigo)
+        expiration_minutes = int(os.getenv("VERIFICATION_CODE_EXPIRATION_MINUTES", "15"))
+        expira_en = datetime.utcnow() + timedelta(
+            minutes=expiration_minutes
+        )
+
+        # Actualizar usuario con codigo de verificacion
+        UsuarioRepository.actualizar_codigo_verificacion(
+            db=db,
+            usuario_id=usuario.id_usuario,
+            codigo_hash=codigo_hash,
+            expira_en=expira_en,
+        )
+
+        # Enviar email con codigo
+        email_enviado = send_verification_email(
+            email=email,
+            nombre=nombre_completo,
+            codigo_verificacion=codigo,
+        )
+
+        return {
+            "usuario_id": usuario.id_usuario,
+            "email": usuario.email,
+            "activo": usuario.activo,
+            "mensaje": "Registro exitoso. Por favor verifica tu correo para activar tu cuenta.",
+            "email_enviado": email_enviado,
+        }
+
+    @staticmethod
+    def verificar_contrasena(contrasena_plana: str, contrasena_hash: str) -> bool:
+        """Verifica una contrasena contra su hash."""
+        return pwd_context.verify(contrasena_plana, contrasena_hash)
+
+    @staticmethod
+    def verificar_codigo(db: Session, email: str, codigo: str) -> dict:
+        """
+        Verifica el codigo enviado al correo y activa el usuario.
+        """
+        usuario = UsuarioRepository.obtener_usuario_por_email(db, email)
+        if not usuario:
+            raise ValueError("No existe un usuario con ese correo.")
+
+        if usuario.activo:
+            return {
+                "email": usuario.email,
+                "activo": usuario.activo,
+                "mensaje": "La cuenta ya esta activa.",
+            }
+
+        if not usuario.codigo_verificacion_hash or not usuario.codigo_verificacion_expira_en:
+            raise ValueError("No hay un codigo de verificacion pendiente para este usuario.")
+
+        max_attempts = int(os.getenv("VERIFICATION_CODE_MAX_ATTEMPTS", "3"))
+        if usuario.codigo_verificacion_intentos >= max_attempts:
+            raise ValueError("Superaste el maximo de intentos. Solicita un nuevo codigo.")
+
+        if datetime.utcnow() > usuario.codigo_verificacion_expira_en:
+            raise ValueError("El codigo de verificacion ha expirado. Solicita uno nuevo.")
+
+        codigo_hash = hash_verification_code(codigo)
+        if codigo_hash != usuario.codigo_verificacion_hash:
+            usuario = UsuarioRepository.incrementar_intentos_verificacion(db, usuario)
+            intentos_restantes = max_attempts - usuario.codigo_verificacion_intentos
+            if intentos_restantes <= 0:
+                raise ValueError("Superaste el maximo de intentos. Solicita un nuevo codigo.")
+            raise ValueError(
+                f"Codigo incorrecto. Te quedan {intentos_restantes} intento(s)."
+            )
+
+        usuario = UsuarioRepository.activar_usuario_y_limpiar_verificacion(db, usuario)
+        return {
+            "email": usuario.email,
+            "activo": usuario.activo,
+            "mensaje": "Cuenta verificada y activada correctamente.",
+        }

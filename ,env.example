@@ -1,0 +1,22 @@
+DB_HOST=localhost
+DB_PORT=5433
+DB_NAME=pos_db
+DB_USER=postgres
+DB_PASSWORD=1234
+
+# JWT Configuration
+JWT_SECRET_KEY=tu-clave-secreta-super-segura-cambiar-en-produccion
+JWT_ALGORITHM=HS256
+JWT_EXPIRATION_HOURS=24
+
+# Email verification settings
+VERIFICATION_CODE_EXPIRATION_MINUTES=15
+VERIFICATION_CODE_MAX_ATTEMPTS=3
+
+# SMTP settings
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=ayrtondazamiranda@gmail.com
+SMTP_PASSWORD=bfdl wuka flgc qvpa
+SMTP_USE_TLS=true
+MAIL_FROM=ayrtondazamiranda@gmail.com
