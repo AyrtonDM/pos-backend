@@ -3,7 +3,12 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.core.database import SessionLocal
-from app.schemas.usuario_schema import UsuarioRegister, UsuarioVerifyCode
+from app.schemas.usuario_schema import (
+    TokenResponse,
+    UsuarioLogin,
+    UsuarioRegister,
+    UsuarioVerifyCode,
+)
 from app.services.usuario_service import UsuarioService
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -57,6 +62,33 @@ def registrar_usuario(
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail="Error al registrar el usuario.")
+
+
+@router.post("/login", response_model=TokenResponse)
+def login_usuario(
+    datos: UsuarioLogin,
+    db: Session = Depends(get_db),
+):
+    """
+    Login de usuario usando email y contrasena.
+
+    Body:
+    {
+        "email": "usuario@example.com",
+        "contrasena": "password123"
+    }
+    """
+    try:
+        resultado = UsuarioService.login_usuario(
+            db=db,
+            email=datos.email,
+            contrasena=datos.contrasena,
+        )
+        return resultado
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception:
+        raise HTTPException(status_code=500, detail="Error al iniciar sesion.")
 
 
 @router.post("/verify-code", response_model=dict)

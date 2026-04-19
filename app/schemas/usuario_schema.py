@@ -26,6 +26,16 @@ class UsuarioVerifyCode(BaseModel):
     codigo: str
 
 
+class UsuarioLogin(BaseModel):
+    email: EmailStr
+    contrasena: str
+
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+
+
 class UsuarioResponse(BaseModel):
     id_usuario: int
     email: str
