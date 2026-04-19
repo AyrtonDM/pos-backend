@@ -2,16 +2,19 @@
 import os
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
-from passlib.context import CryptContext
 from sqlalchemy.orm import Session
 
 from app.repositories.usuario_repository import UsuarioRepository
-from app.utils.security import generate_verification_code, hash_verification_code
+from app.core.security import (
+    create_access_token,
+    generate_verification_code,
+    get_password_hash,
+    hash_verification_code,
+    verify_password,
+)
 from app.utils.email_service import send_verification_email
 
 load_dotenv()
-
-pwd_context = CryptContext(schemes=["bcrypt_sha256"], deprecated="auto")
 
 
 class UsuarioService:
@@ -39,7 +42,7 @@ class UsuarioService:
             raise ValueError("El correo electronico ya esta registrado.")
 
         # Hash la contrasena
-        contrasena_hash = pwd_context.hash(contrasena)
+        contrasena_hash = get_password_hash(contrasena)
 
         # Crear usuario y persona
         usuario = UsuarioRepository.crear_usuario_con_persona(
@@ -87,7 +90,28 @@ class UsuarioService:
     @staticmethod
     def verificar_contrasena(contrasena_plana: str, contrasena_hash: str) -> bool:
         """Verifica una contrasena contra su hash."""
-        return pwd_context.verify(contrasena_plana, contrasena_hash)
+        return verify_password(contrasena_plana, contrasena_hash)
+
+    @staticmethod
+    def login_usuario(db: Session, email: str, contrasena: str) -> dict:
+        """
+        Autentica un usuario y retorna un token JWT.
+        """
+        usuario = UsuarioRepository.obtener_usuario_por_email(db, email)
+        if not usuario:
+            raise ValueError("Correo o contrasena incorrectos.")
+
+        if not verify_password(contrasena, usuario.contrasena):
+            raise ValueError("Correo o contrasena incorrectos.")
+
+        if not usuario.activo:
+            raise ValueError("Usuario no encontrado o inactivo")
+
+        token = create_access_token(user_id=usuario.id_usuario, email=usuario.email)
+        return {
+            "access_token": token,
+            "token_type": "bearer",
+        }
 
     @staticmethod
     def verificar_codigo(db: Session, email: str, codigo: str) -> dict:
