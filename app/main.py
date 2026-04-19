@@ -1,12 +1,17 @@
+from pathlib import Path
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from app.core.database import Base, engine
 from app.core.schema_updates import apply_schema_updates
 from app.models.empresas import Empresa, Sucursal
+from app.models.productos import CategoriaProducto, Producto, Stock, SubcategoriaProducto
 from app.models.usuarios import Persona, Rol, Usuario, UsuarioRol
 from app.routers.empresa_router import router as empresa_router
 from app.routers.auth_router import router as auth_router
+from app.routers.producto_router import router as producto_router
 from app.routers.sucursal_router import (
     empresa_router as sucursal_empresa_router,
     invitacion_router,
@@ -30,9 +35,14 @@ app.add_middleware(
 
 app.include_router(auth_router)
 app.include_router(empresa_router)
+app.include_router(producto_router)
 app.include_router(sucursal_empresa_router)
 app.include_router(sucursal_router)
 app.include_router(invitacion_router)
+
+media_root = Path("media")
+media_root.mkdir(parents=True, exist_ok=True)
+app.mount("/media", StaticFiles(directory=media_root), name="media")
 
 @app.on_event("startup")
 def on_startup() -> None:

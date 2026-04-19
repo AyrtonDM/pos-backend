@@ -35,6 +35,14 @@ def apply_schema_updates() -> None:
         connection.execute(
             text(
                 """
+                ALTER TABLE producto
+                ADD COLUMN IF NOT EXISTS imagen VARCHAR(255)
+                """
+            )
+        )
+        connection.execute(
+            text(
+                """
                 ALTER TABLE usuario_rol
                 DROP CONSTRAINT IF EXISTS uq_usuario_rol
                 """
