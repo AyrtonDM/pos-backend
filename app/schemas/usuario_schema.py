@@ -31,6 +31,10 @@ class UsuarioLogin(BaseModel):
     contrasena: str
 
 
+class UsuarioForgotPassword(BaseModel):
+    email: EmailStr
+
+
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"

@@ -7,17 +7,22 @@ from sqlalchemy.orm import Session
 from app.repositories.usuario_repository import UsuarioRepository
 from app.core.security import (
     create_access_token,
+    generate_temporary_password,
     generate_verification_code,
     get_password_hash,
     hash_verification_code,
     verify_password,
 )
-from app.utils.email_service import send_verification_email
+from app.utils.email_service import send_password_recovery_email, send_verification_email
 
 load_dotenv()
 
 
 class UsuarioService:
+    PASSWORD_RECOVERY_MESSAGE = (
+        "Si el correo esta registrado, recibiras una nueva contrasena en tu email."
+    )
+
     @staticmethod
     def registrar_usuario(
         db: Session,
@@ -155,3 +160,31 @@ class UsuarioService:
             "activo": usuario.activo,
             "mensaje": "Cuenta verificada y activada correctamente.",
         }
+
+    @staticmethod
+    def solicitar_recuperacion_contrasena(db: Session, email: str) -> dict:
+        """
+        Genera y envia una nueva contrasena si el usuario existe.
+        La respuesta publica siempre es generica para no filtrar emails registrados.
+        """
+        usuario = UsuarioRepository.obtener_usuario_por_email(db, email)
+        if not usuario:
+            return {"mensaje": UsuarioService.PASSWORD_RECOVERY_MESSAGE}
+
+        nueva_contrasena = generate_temporary_password()
+        nombre = usuario.persona.nombre_completo if usuario.persona else usuario.email
+
+        email_enviado = send_password_recovery_email(
+            email=usuario.email,
+            nombre=nombre,
+            nueva_contrasena=nueva_contrasena,
+        )
+
+        if email_enviado:
+            UsuarioRepository.actualizar_contrasena(
+                db=db,
+                usuario=usuario,
+                contrasena_hash=get_password_hash(nueva_contrasena),
+            )
+
+        return {"mensaje": UsuarioService.PASSWORD_RECOVERY_MESSAGE}

@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from app.core.database import SessionLocal
 from app.schemas.usuario_schema import (
     TokenResponse,
+    UsuarioForgotPassword,
     UsuarioLogin,
     UsuarioRegister,
     UsuarioVerifyCode,
@@ -116,3 +117,25 @@ def verificar_codigo(
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail="Error al verificar el codigo.")
+
+
+@router.post("/forgot-password", response_model=dict)
+def solicitar_recuperacion_contrasena(
+    datos: UsuarioForgotPassword,
+    db: Session = Depends(get_db),
+):
+    """
+    Solicita recuperacion de contrasena por email.
+
+    Body:
+    {
+        "email": "usuario@example.com"
+    }
+    """
+    try:
+        return UsuarioService.solicitar_recuperacion_contrasena(
+            db=db,
+            email=datos.email,
+        )
+    except Exception:
+        return {"mensaje": UsuarioService.PASSWORD_RECOVERY_MESSAGE}

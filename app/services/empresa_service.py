@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from datetime import date
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.repositories.empresa_repository import EmpresaRepository
@@ -20,25 +21,43 @@ class EmpresaService:
         if current_user is None or not current_user.activo:
             raise ValueError("Usuario no autorizado o inactivo.")
 
-        empresa = EmpresaRepository.crear_empresa(
+        rol_administrador = EmpresaRepository.obtener_rol_por_nombre(
             db=db,
-            datos={
-                "nombre": nombre,
-                "razon_social": razon_social,
-                "nit": nit,
-                "correo": correo,
-                "fecha_creacion": date.today(),
-                "activo": True,
-            },
+            nombre="ADMINISTRADOR",
         )
+        if rol_administrador is None:
+            raise ValueError("No existe el rol ADMINISTRADOR.")
 
-        usuario_rol = EmpresaRepository.crear_usuario_rol(
-            db=db,
-            id_usuario=current_user.id_usuario,
-            id_rol=1,
-            id_empresa=empresa.id_empresa,
-            activo=True,
-        )
+        try:
+            empresa = EmpresaRepository.crear_empresa(
+                db=db,
+                datos={
+                    "nombre": nombre,
+                    "razon_social": razon_social,
+                    "nit": nit,
+                    "correo": correo,
+                    "fecha_creacion": date.today(),
+                    "activo": True,
+                },
+            )
+
+            usuario_rol = EmpresaRepository.crear_usuario_rol(
+                db=db,
+                id_usuario=current_user.id_usuario,
+                id_rol=rol_administrador.id_rol,
+                id_empresa=empresa.id_empresa,
+                activo=True,
+            )
+
+            db.commit()
+            db.refresh(empresa)
+            db.refresh(usuario_rol)
+        except IntegrityError as exc:
+            db.rollback()
+            raise ValueError("Ya existe una empresa con ese NIT o correo.") from exc
+        except Exception:
+            db.rollback()
+            raise
 
         return {
             "empresa": {
