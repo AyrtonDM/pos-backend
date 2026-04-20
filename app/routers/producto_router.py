@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 from decimal import Decimal
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, HTTPException
+from fastapi import File, Form, UploadFile
 from sqlalchemy.orm import Session
 
 from app.core.database import SessionLocal
@@ -14,8 +15,6 @@ from app.schemas.producto_schema import (
     ProductoCreate,
     ProductoResponse,
     ProductoUpdate,
-    StockResponse,
-    StockUpdate,
     SubcategoriaProductoCreate,
     SubcategoriaProductoResponse,
     SubcategoriaProductoUpdate,
@@ -90,17 +89,6 @@ def actualizar_categoria(
         raise HTTPException(status_code=500, detail="Error al actualizar la categoria.")
 
 
-@router.delete("/categorias/{id_categoria_producto}")
-def eliminar_categoria(id_categoria_producto: int, db: Session = Depends(get_db), current_user: Usuario = Depends(get_current_user)):
-    try:
-        ProductoService.eliminar_categoria(db=db, id_categoria_producto=id_categoria_producto)
-        return {"mensaje": "Categoria eliminada correctamente."}
-    except LookupError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-    except Exception:
-        raise HTTPException(status_code=500, detail="Error al eliminar la categoria.")
-
-
 @router.get("/subcategorias", response_model=list[SubcategoriaProductoResponse])
 def listar_subcategorias(db: Session = Depends(get_db), current_user: Usuario = Depends(get_current_user)):
     try:
@@ -161,25 +149,13 @@ def actualizar_subcategoria(
         raise HTTPException(status_code=500, detail="Error al actualizar la subcategoria.")
 
 
-@router.delete("/subcategorias/{id_subcategoria}")
-def eliminar_subcategoria(id_subcategoria: int, db: Session = Depends(get_db), current_user: Usuario = Depends(get_current_user)):
-    try:
-        ProductoService.eliminar_subcategoria(db=db, id_subcategoria=id_subcategoria)
-        return {"mensaje": "Subcategoria eliminada correctamente."}
-    except LookupError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-    except Exception:
-        raise HTTPException(status_code=500, detail="Error al eliminar la subcategoria.")
-
-
 @router.get("", response_model=list[ProductoResponse])
 def listar_productos(
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(get_current_user),
-    id_empresa: int | None = None,
 ):
     try:
-        return ProductoService.listar_productos(db=db, current_user=current_user, id_empresa=id_empresa)
+        return ProductoService.listar_productos(db=db, current_user=current_user)
     except Exception:
         raise HTTPException(status_code=500, detail="Error al listar los productos.")
 
@@ -198,14 +174,12 @@ def crear_producto(datos: ProductoCreate, db: Session = Depends(get_db), current
 
 @router.post("/con-imagen", response_model=ProductoResponse)
 def crear_producto_con_imagen(
-    id_empresa: int = Form(...),
     id_subcategoria: int = Form(...),
     nombre: str = Form(...),
-    costo: Decimal = Form(Decimal("0")),
+    descripcion: str | None = Form(None),
+    unidad_medida: str = Form(...),
     precio: Decimal = Form(Decimal("0")),
-    cantidad: int = Form(0),
-    stock_min: int = Form(0),
-    stock_max: int = Form(0),
+    activo: bool = Form(True),
     imagen: UploadFile | None = File(None),
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(get_current_user),
@@ -213,19 +187,15 @@ def crear_producto_con_imagen(
     try:
         imagen_path = None
         if imagen is not None and imagen.filename:
-            imagen_path = save_product_image(imagen, id_empresa)
+            imagen_path = save_product_image(imagen)
 
         payload = ProductoCreate(
-            id_empresa=id_empresa,
             id_subcategoria=id_subcategoria,
             nombre=nombre,
-            costo=costo,
+            descripcion=descripcion,
+            unidad_medida=unidad_medida,
             precio=precio,
-            stock={
-                "cantidad": cantidad,
-                "stock_min": stock_min,
-                "stock_max": stock_max,
-            },
+            activo=activo,
         )
 
         return ProductoService.crear_producto(
@@ -277,8 +247,7 @@ def actualizar_imagen_producto(
     current_user: Usuario = Depends(get_current_user),
 ):
     try:
-        producto = ProductoService.obtener_producto(db=db, current_user=current_user, id_producto=id_producto)
-        imagen_path = save_product_image(imagen, producto.id_empresa)
+        imagen_path = save_product_image(imagen)
         return ProductoService.actualizar_imagen_producto(
             db=db,
             current_user=current_user,
@@ -302,30 +271,3 @@ def eliminar_producto(id_producto: int, db: Session = Depends(get_db), current_u
         raise HTTPException(status_code=404, detail=str(e))
     except Exception:
         raise HTTPException(status_code=500, detail="Error al eliminar el producto.")
-
-
-@router.get("/{id_producto}/stock", response_model=StockResponse)
-def obtener_stock(id_producto: int, db: Session = Depends(get_db), current_user: Usuario = Depends(get_current_user)):
-    try:
-        return ProductoService.obtener_stock_de_producto(db=db, current_user=current_user, id_producto=id_producto)
-    except LookupError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-    except Exception:
-        raise HTTPException(status_code=500, detail="Error al obtener el stock.")
-
-
-@router.put("/{id_producto}/stock", response_model=StockResponse)
-def actualizar_stock(
-    id_producto: int,
-    datos: StockUpdate,
-    db: Session = Depends(get_db),
-    current_user: Usuario = Depends(get_current_user),
-):
-    try:
-        return ProductoService.actualizar_stock_de_producto(db=db, current_user=current_user, id_producto=id_producto, payload=datos)
-    except LookupError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception:
-        raise HTTPException(status_code=500, detail="Error al actualizar el stock.")

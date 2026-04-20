@@ -7,7 +7,7 @@ from fastapi.staticfiles import StaticFiles
 from app.core.database import Base, engine
 from app.core.schema_updates import apply_schema_updates
 from app.models.empresas import Empresa, Sucursal
-from app.models.productos import CategoriaProducto, Producto, Stock, SubcategoriaProducto
+from app.models.productos import CategoriaProducto, Producto, SubcategoriaProducto
 from app.models.usuarios import Persona, Rol, Usuario, UsuarioRol
 from app.routers.empresa_router import router as empresa_router
 from app.routers.auth_router import router as auth_router

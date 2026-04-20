@@ -1,4 +1,3 @@
-from datetime import datetime
 from decimal import Decimal
 
 from pydantic import BaseModel, Field
@@ -59,40 +58,13 @@ class SubcategoriaProductoResponse(BaseModel):
         from_attributes = True
 
 
-class StockBase(BaseModel):
-    cantidad: int = Field(ge=0)
-    stock_min: int = Field(ge=0)
-    stock_max: int = Field(ge=0)
-
-
-class StockCreate(StockBase):
-    pass
-
-
-class StockUpdate(BaseModel):
-    cantidad: int | None = Field(default=None, ge=0)
-    stock_min: int | None = Field(default=None, ge=0)
-    stock_max: int | None = Field(default=None, ge=0)
-
-
-class StockResponse(BaseModel):
-    id_stock: int
-    cantidad: int
-    stock_min: int
-    stock_max: int
-    fecha_actualizacion: datetime
-
-    class Config:
-        from_attributes = True
-
-
 class ProductoBase(BaseModel):
-    id_empresa: int
     id_subcategoria: int
     nombre: str = Field(max_length=150)
-    costo: Decimal = Decimal("0")
+    descripcion: str | None = None
+    unidad_medida: str = Field(max_length=50)
     precio: Decimal = Decimal("0")
-    stock: StockCreate
+    activo: bool = True
 
 
 class ProductoCreate(ProductoBase):
@@ -100,24 +72,24 @@ class ProductoCreate(ProductoBase):
 
 
 class ProductoUpdate(BaseModel):
-    id_empresa: int | None = None
     id_subcategoria: int | None = None
     nombre: str | None = None
-    costo: Decimal | None = None
+    descripcion: str | None = None
+    unidad_medida: str | None = None
     precio: Decimal | None = None
-    stock: StockUpdate | None = None
+    activo: bool | None = None
 
 
 class ProductoResponse(BaseModel):
     id_producto: int
-    id_empresa: int
-    id_subcategoria: int
+    id_subcategoria: int | None
     nombre: str
-    costo: Decimal
+    descripcion: str | None
+    unidad_medida: str
     precio: Decimal
     imagen: str | None
-    subcategoria: SubcategoriaProductoResponse
-    stock: StockResponse
+    activo: bool
+    subcategoria: SubcategoriaProductoResponse | None
 
     class Config:
         from_attributes = True

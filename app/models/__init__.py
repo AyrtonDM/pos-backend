@@ -1,6 +1,6 @@
 from app.models.empresas.empresa import Empresa
 from app.models.empresas.sucursal import Sucursal
-from app.models.productos import CategoriaProducto, Producto, Stock, SubcategoriaProducto
+from app.models.productos import CategoriaProducto, Producto, SubcategoriaProducto
 from app.models.usuarios.persona import Persona
 from app.models.usuarios.rol import Rol
 from app.models.usuarios.usuario import Usuario
@@ -16,5 +16,4 @@ __all__ = [
 	"CategoriaProducto",
 	"SubcategoriaProducto",
 	"Producto",
-	"Stock",
 ]

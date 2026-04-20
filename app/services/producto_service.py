@@ -3,20 +3,13 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.models.usuarios.usuario import Usuario
-from app.repositories.empresa_repository import EmpresaRepository
 from app.repositories.producto_repository import ProductoRepository
 from app.schemas.producto_schema import (
-    CategoriaProductoCreate,
     CategoriaProductoResponse,
     ProductoCreate,
     ProductoResponse,
     ProductoUpdate,
-    StockCreate,
-    StockResponse,
-    StockUpdate,
-    SubcategoriaProductoCreate,
     SubcategoriaProductoResponse,
-    SubcategoriaProductoUpdate,
 )
 
 
@@ -25,18 +18,6 @@ class ProductoService:
     def _validar_usuario_activo(current_user: Usuario) -> None:
         if current_user is None or not current_user.activo:
             raise ValueError("Usuario no autorizado o inactivo.")
-
-    @staticmethod
-    def _validar_empresa_del_usuario(db: Session, current_user: Usuario, id_empresa: int) -> None:
-        ProductoService._validar_usuario_activo(current_user)
-
-        empresa = EmpresaRepository.obtener_empresa_por_usuario(
-            db=db,
-            id_usuario=current_user.id_usuario,
-            id_empresa=id_empresa,
-        )
-        if empresa is None:
-            raise LookupError("Empresa no encontrada para este usuario.")
 
     @staticmethod
     def _validar_categoria_activa(categoria) -> None:
@@ -51,15 +32,6 @@ class ProductoService:
             raise LookupError("Subcategoria no encontrada.")
         if not subcategoria.activo:
             raise ValueError("La subcategoria esta inactiva.")
-
-    @staticmethod
-    def _validar_stock(stock) -> None:
-        if stock is None:
-            return
-        if stock.stock_min is not None and stock.stock_max is not None and stock.stock_min > stock.stock_max:
-            raise ValueError("stock_min no puede ser mayor que stock_max.")
-        if getattr(stock, "cantidad", None) is not None and stock.cantidad < 0:
-            raise ValueError("La cantidad de stock no puede ser negativa.")
 
     @staticmethod
     def _serializar_categoria(categoria) -> dict:
@@ -81,27 +53,21 @@ class ProductoService:
         }
 
     @staticmethod
-    def _serializar_stock(stock) -> dict:
-        return {
-            "id_stock": stock.id_stock,
-            "cantidad": stock.cantidad,
-            "stock_min": stock.stock_min,
-            "stock_max": stock.stock_max,
-            "fecha_actualizacion": stock.fecha_actualizacion,
-        }
-
-    @staticmethod
     def _serializar_producto(producto) -> dict:
         return {
             "id_producto": producto.id_producto,
-            "id_empresa": producto.id_empresa,
             "id_subcategoria": producto.id_subcategoria,
             "nombre": producto.nombre,
-            "costo": producto.costo,
+            "descripcion": producto.descripcion,
+            "unidad_medida": producto.unidad_medida or "",
             "precio": producto.precio,
             "imagen": producto.imagen,
-            "subcategoria": ProductoService._serializar_subcategoria(producto.subcategoria),
-            "stock": ProductoService._serializar_stock(producto.stock),
+            "activo": producto.activo,
+            "subcategoria": (
+                ProductoService._serializar_subcategoria(producto.subcategoria)
+                if producto.subcategoria is not None
+                else None
+            ),
         }
 
     @staticmethod
@@ -156,13 +122,6 @@ class ProductoService:
         except IntegrityError as exc:
             db.rollback()
             raise ValueError("Ya existe una categoria con ese nombre.") from exc
-
-    @staticmethod
-    def eliminar_categoria(db: Session, id_categoria_producto: int) -> None:
-        categoria = ProductoRepository.obtener_categoria_por_id(db, id_categoria_producto)
-        if categoria is None:
-            raise LookupError("Categoria no encontrada.")
-        ProductoRepository.eliminar_categoria(categoria, db)
 
     @staticmethod
     def listar_subcategorias(db: Session):
@@ -237,27 +196,9 @@ class ProductoService:
             raise ValueError("No se pudo actualizar la subcategoria.") from exc
 
     @staticmethod
-    def eliminar_subcategoria(db: Session, id_subcategoria: int) -> None:
-        subcategoria = ProductoRepository.obtener_subcategoria_por_id(db, id_subcategoria)
-        if subcategoria is None:
-            raise LookupError("Subcategoria no encontrada.")
-        ProductoRepository.eliminar_subcategoria(subcategoria, db)
-
-    @staticmethod
-    def listar_productos(db: Session, current_user: Usuario, id_empresa: int | None = None):
+    def listar_productos(db: Session, current_user: Usuario):
         ProductoService._validar_usuario_activo(current_user)
-
-        if id_empresa is not None:
-            ProductoService._validar_empresa_del_usuario(db, current_user, id_empresa)
-            productos = ProductoRepository.obtener_productos_por_empresa(db, id_empresa)
-        else:
-            empresas = EmpresaRepository.obtener_empresas_por_usuario(db, current_user.id_usuario)
-            if not empresas:
-                return []
-            productos = []
-            for empresa in empresas:
-                productos.extend(ProductoRepository.obtener_productos_por_empresa(db, empresa.id_empresa))
-
+        productos = ProductoRepository.obtener_productos(db)
         return [ProductoResponse.model_validate(ProductoService._serializar_producto(producto)) for producto in productos]
 
     @staticmethod
@@ -267,32 +208,22 @@ class ProductoService:
         payload: ProductoCreate,
         imagen: str | None = None,
     ) -> ProductoResponse:
-        ProductoService._validar_empresa_del_usuario(db, current_user, payload.id_empresa)
+        ProductoService._validar_usuario_activo(current_user)
 
         subcategoria = ProductoRepository.obtener_subcategoria_por_id(db, payload.id_subcategoria)
         ProductoService._validar_subcategoria_activa(subcategoria)
-
-        ProductoService._validar_stock(payload.stock)
 
         try:
             producto = ProductoRepository.crear_producto(
                 db=db,
                 datos={
-                    "id_empresa": payload.id_empresa,
                     "id_subcategoria": payload.id_subcategoria,
                     "nombre": payload.nombre,
-                    "costo": payload.costo,
+                    "descripcion": payload.descripcion,
+                    "unidad_medida": payload.unidad_medida,
                     "precio": payload.precio,
                     "imagen": imagen,
-                },
-            )
-            ProductoRepository.crear_stock(
-                db=db,
-                datos={
-                    "id_producto": producto.id_producto,
-                    "cantidad": payload.stock.cantidad,
-                    "stock_min": payload.stock.stock_min,
-                    "stock_max": payload.stock.stock_max,
+                    "activo": True,
                 },
             )
             db.commit()
@@ -308,7 +239,6 @@ class ProductoService:
         producto = ProductoRepository.obtener_producto_por_id(db, id_producto)
         if producto is None:
             raise LookupError("Producto no encontrado.")
-        ProductoService._validar_empresa_del_usuario(db, current_user, producto.id_empresa)
         return ProductoResponse.model_validate(ProductoService._serializar_producto(producto))
 
     @staticmethod
@@ -318,54 +248,28 @@ class ProductoService:
         if producto is None:
             raise LookupError("Producto no encontrado.")
 
-        ProductoService._validar_empresa_del_usuario(db, current_user, producto.id_empresa)
-
         datos = {}
-        if payload.id_empresa is not None and payload.id_empresa != producto.id_empresa:
-            ProductoService._validar_empresa_del_usuario(db, current_user, payload.id_empresa)
-            datos["id_empresa"] = payload.id_empresa
         if payload.id_subcategoria is not None:
             subcategoria = ProductoRepository.obtener_subcategoria_por_id(db, payload.id_subcategoria)
             ProductoService._validar_subcategoria_activa(subcategoria)
             datos["id_subcategoria"] = payload.id_subcategoria
         if payload.nombre is not None:
             datos["nombre"] = payload.nombre
-        if payload.costo is not None:
-            datos["costo"] = payload.costo
+        if payload.descripcion is not None:
+            datos["descripcion"] = payload.descripcion
+        if payload.unidad_medida is not None:
+            datos["unidad_medida"] = payload.unidad_medida
         if payload.precio is not None:
             datos["precio"] = payload.precio
-
-        if payload.stock is not None:
-            ProductoService._validar_stock(payload.stock)
+        if payload.activo is not None:
+            datos["activo"] = payload.activo
 
         try:
             if datos:
                 producto = ProductoRepository.actualizar_producto(producto, datos, db)
+            else:
+                db.refresh(producto)
 
-            if payload.stock is not None:
-                stock = ProductoRepository.obtener_stock_por_producto(db, producto.id_producto)
-                if stock is None:
-                    ProductoRepository.crear_stock(
-                        db=db,
-                        datos={
-                            "id_producto": producto.id_producto,
-                            "cantidad": payload.stock.cantidad or 0,
-                            "stock_min": payload.stock.stock_min or 0,
-                            "stock_max": payload.stock.stock_max or 0,
-                        },
-                    )
-                else:
-                    stock_datos = {}
-                    if payload.stock.cantidad is not None:
-                        stock_datos["cantidad"] = payload.stock.cantidad
-                    if payload.stock.stock_min is not None:
-                        stock_datos["stock_min"] = payload.stock.stock_min
-                    if payload.stock.stock_max is not None:
-                        stock_datos["stock_max"] = payload.stock.stock_max
-                    ProductoRepository.actualizar_stock(stock, stock_datos, db)
-
-            db.commit()
-            producto = ProductoRepository.obtener_producto_por_id(db, producto.id_producto)
             return ProductoResponse.model_validate(ProductoService._serializar_producto(producto))
         except IntegrityError as exc:
             db.rollback()
@@ -373,63 +277,11 @@ class ProductoService:
 
     @staticmethod
     def eliminar_producto(db: Session, current_user: Usuario, id_producto: int) -> None:
+        ProductoService._validar_usuario_activo(current_user)
         producto = ProductoRepository.obtener_producto_por_id(db, id_producto)
         if producto is None:
             raise LookupError("Producto no encontrado.")
-
-        ProductoService._validar_empresa_del_usuario(db, current_user, producto.id_empresa)
         ProductoRepository.eliminar_producto(producto, db)
-
-    @staticmethod
-    def obtener_stock_de_producto(db: Session, current_user: Usuario, id_producto: int) -> StockResponse:
-        producto = ProductoRepository.obtener_producto_por_id(db, id_producto)
-        if producto is None:
-            raise LookupError("Producto no encontrado.")
-
-        ProductoService._validar_empresa_del_usuario(db, current_user, producto.id_empresa)
-        stock = ProductoRepository.obtener_stock_por_producto(db, id_producto)
-        if stock is None:
-            raise LookupError("Stock no encontrado.")
-        return StockResponse.model_validate(ProductoService._serializar_stock(stock))
-
-    @staticmethod
-    def actualizar_stock_de_producto(
-        db: Session,
-        current_user: Usuario,
-        id_producto: int,
-        payload: StockUpdate,
-    ) -> StockResponse:
-        producto = ProductoRepository.obtener_producto_por_id(db, id_producto)
-        if producto is None:
-            raise LookupError("Producto no encontrado.")
-
-        ProductoService._validar_empresa_del_usuario(db, current_user, producto.id_empresa)
-        ProductoService._validar_stock(payload)
-
-        stock = ProductoRepository.obtener_stock_por_producto(db, id_producto)
-        if stock is None:
-            stock = ProductoRepository.crear_stock(
-                db=db,
-                datos={
-                    "id_producto": id_producto,
-                    "cantidad": payload.cantidad or 0,
-                    "stock_min": payload.stock_min or 0,
-                    "stock_max": payload.stock_max or 0,
-                },
-            )
-            db.commit()
-            return StockResponse.model_validate(ProductoService._serializar_stock(stock))
-
-        datos = {}
-        if payload.cantidad is not None:
-            datos["cantidad"] = payload.cantidad
-        if payload.stock_min is not None:
-            datos["stock_min"] = payload.stock_min
-        if payload.stock_max is not None:
-            datos["stock_max"] = payload.stock_max
-
-        stock = ProductoRepository.actualizar_stock(stock, datos, db)
-        return StockResponse.model_validate(ProductoService._serializar_stock(stock))
 
     @staticmethod
     def actualizar_imagen_producto(
@@ -438,11 +290,10 @@ class ProductoService:
         id_producto: int,
         imagen: str,
     ) -> ProductoResponse:
+        ProductoService._validar_usuario_activo(current_user)
         producto = ProductoRepository.obtener_producto_por_id(db, id_producto)
         if producto is None:
             raise LookupError("Producto no encontrado.")
-
-        ProductoService._validar_empresa_del_usuario(db, current_user, producto.id_empresa)
 
         producto = ProductoRepository.actualizar_producto(producto, {"imagen": imagen}, db)
         return ProductoResponse.model_validate(ProductoService._serializar_producto(producto))

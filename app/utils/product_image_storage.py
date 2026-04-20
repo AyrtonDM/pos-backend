@@ -4,9 +4,9 @@ from uuid import uuid4
 from fastapi import UploadFile
 
 
-def save_product_image(file: UploadFile, id_empresa: int) -> str:
+def save_product_image(file: UploadFile) -> str:
     media_root = Path(__file__).resolve().parent.parent / "media"
-    relative_dir = Path("products") / f"empresa_{id_empresa}"
+    relative_dir = Path("products")
     target_dir = media_root / relative_dir
     target_dir.mkdir(parents=True, exist_ok=True)
 

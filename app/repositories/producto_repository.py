@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from sqlalchemy.orm import Session, joinedload
 
-from app.models.productos import CategoriaProducto, Producto, Stock, SubcategoriaProducto
+from app.models.productos import CategoriaProducto, Producto, SubcategoriaProducto
 
 
 class ProductoRepository:
@@ -28,11 +28,6 @@ class ProductoRepository:
         db.commit()
         db.refresh(categoria)
         return categoria
-
-    @staticmethod
-    def eliminar_categoria(categoria: CategoriaProducto, db: Session) -> None:
-        db.delete(categoria)
-        db.commit()
 
     @staticmethod
     def crear_subcategoria(db: Session, datos: dict) -> SubcategoriaProducto:
@@ -64,11 +59,6 @@ class ProductoRepository:
         return subcategoria
 
     @staticmethod
-    def eliminar_subcategoria(subcategoria: SubcategoriaProducto, db: Session) -> None:
-        db.delete(subcategoria)
-        db.commit()
-
-    @staticmethod
     def crear_producto(db: Session, datos: dict) -> Producto:
         producto = Producto(**datos)
         db.add(producto)
@@ -80,29 +70,19 @@ class ProductoRepository:
     def obtener_producto_por_id(db: Session, id_producto: int) -> Producto | None:
         return (
             db.query(Producto)
-            .options(
-                joinedload(Producto.subcategoria).joinedload(SubcategoriaProducto.categoria_producto),
-                joinedload(Producto.stock),
-                joinedload(Producto.empresa),
-            )
+            .options(joinedload(Producto.subcategoria).joinedload(SubcategoriaProducto.categoria_producto))
             .filter(Producto.id_producto == id_producto)
             .first()
         )
 
     @staticmethod
-    def obtener_productos_por_empresa(db: Session, id_empresa: int | None) -> list[Producto]:
-        query = (
+    def obtener_productos(db: Session) -> list[Producto]:
+        return (
             db.query(Producto)
-            .options(
-                joinedload(Producto.subcategoria).joinedload(SubcategoriaProducto.categoria_producto),
-                joinedload(Producto.stock),
-                joinedload(Producto.empresa),
-            )
+            .options(joinedload(Producto.subcategoria).joinedload(SubcategoriaProducto.categoria_producto))
             .order_by(Producto.nombre.asc())
+            .all()
         )
-        if id_empresa is not None:
-            query = query.filter(Producto.id_empresa == id_empresa)
-        return query.all()
 
     @staticmethod
     def actualizar_producto(producto: Producto, datos: dict, db: Session) -> Producto:
@@ -116,23 +96,3 @@ class ProductoRepository:
     def eliminar_producto(producto: Producto, db: Session) -> None:
         db.delete(producto)
         db.commit()
-
-    @staticmethod
-    def crear_stock(db: Session, datos: dict) -> Stock:
-        stock = Stock(**datos)
-        db.add(stock)
-        db.flush()
-        db.refresh(stock)
-        return stock
-
-    @staticmethod
-    def obtener_stock_por_producto(db: Session, id_producto: int) -> Stock | None:
-        return db.query(Stock).filter(Stock.id_producto == id_producto).first()
-
-    @staticmethod
-    def actualizar_stock(stock: Stock, datos: dict, db: Session) -> Stock:
-        for campo, valor in datos.items():
-            setattr(stock, campo, valor)
-        db.commit()
-        db.refresh(stock)
-        return stock
