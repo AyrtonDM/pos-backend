@@ -3,3 +3,8 @@ __pycache__/
 *.pyc
 .env
 .vscode/
+
+# Uploads de imagenes y archivos multimedia
+app/media/**
+!app/media/.gitkeep
+
