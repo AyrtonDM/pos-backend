@@ -1,5 +1,6 @@
 from app.models.empresas.empresa import Empresa
 from app.models.empresas.sucursal import Sucursal
+from app.models.inventario import MovimientoInventario, Stock, TipoMovimiento
 from app.models.productos import CategoriaProducto, Producto, SubcategoriaProducto
 from app.models.usuarios.persona import Persona
 from app.models.usuarios.rol import Rol
@@ -13,6 +14,9 @@ __all__ = [
 	"UsuarioRol",
 	"Empresa",
 	"Sucursal",
+	"Stock",
+	"TipoMovimiento",
+	"MovimientoInventario",
 	"CategoriaProducto",
 	"SubcategoriaProducto",
 	"Producto",

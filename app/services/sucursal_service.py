@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import os
 from datetime import date
+from datetime import datetime
 
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -9,6 +10,7 @@ from app.models.usuarios import Usuario
 from app.repositories.empresa_repository import EmpresaRepository
 from app.repositories.sucursal_repository import SucursalRepository
 from app.repositories.usuario_repository import UsuarioRepository
+from app.services.inventario_service import InventarioService
 from app.utils.email_service import send_employee_invitation_email
 
 
@@ -90,6 +92,11 @@ class SucursalService:
                     activo=True,
                 )
 
+            InventarioService.sincronizar_stocks_por_sucursal(
+                db=db,
+                id_sucursal=sucursal.id_sucursal,
+                fecha_actualizacion=datetime.now(),
+            )
             db.commit()
             db.refresh(sucursal)
             return sucursal

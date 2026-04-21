@@ -35,7 +35,54 @@ def apply_schema_updates() -> None:
         connection.execute(
             text(
                 """
-                DROP TABLE IF EXISTS stock
+                ALTER TABLE movimiento_inventario
+                ADD COLUMN IF NOT EXISTS id_usuario INTEGER
+                """
+            )
+        )
+        connection.execute(
+            text(
+                """
+                DO $$
+                BEGIN
+                    IF NOT EXISTS (
+                        SELECT 1
+                        FROM pg_constraint
+                        WHERE conname = 'fk_movimiento_inventario_usuario'
+                    ) THEN
+                        ALTER TABLE movimiento_inventario
+                        ADD CONSTRAINT fk_movimiento_inventario_usuario
+                        FOREIGN KEY (id_usuario)
+                        REFERENCES usuario(id_usuario);
+                    END IF;
+                END $$;
+                """
+            )
+        )
+        connection.execute(
+            text(
+                """
+                ALTER TABLE categoria_producto
+                ADD COLUMN IF NOT EXISTS id_empresa INTEGER
+                """
+            )
+        )
+        connection.execute(
+            text(
+                """
+                DO $$
+                BEGIN
+                    IF NOT EXISTS (
+                        SELECT 1
+                        FROM pg_constraint
+                        WHERE conname = 'fk_categoria_producto_empresa'
+                    ) THEN
+                        ALTER TABLE categoria_producto
+                        ADD CONSTRAINT fk_categoria_producto_empresa
+                        FOREIGN KEY (id_empresa)
+                        REFERENCES empresa(id_empresa);
+                    END IF;
+                END $$;
                 """
             )
         )
@@ -43,13 +90,32 @@ def apply_schema_updates() -> None:
             text(
                 """
                 ALTER TABLE producto
-                DROP COLUMN IF EXISTS id_empresa CASCADE,
                 DROP COLUMN IF EXISTS costo,
+                ADD COLUMN IF NOT EXISTS id_empresa INTEGER,
                 ADD COLUMN IF NOT EXISTS id_subcategoria INTEGER,
                 ADD COLUMN IF NOT EXISTS descripcion TEXT,
                 ADD COLUMN IF NOT EXISTS unidad_medida VARCHAR(50),
                 ADD COLUMN IF NOT EXISTS imagen VARCHAR(255),
                 ADD COLUMN IF NOT EXISTS activo BOOLEAN DEFAULT TRUE
+                """
+            )
+        )
+        connection.execute(
+            text(
+                """
+                DO $$
+                BEGIN
+                    IF NOT EXISTS (
+                        SELECT 1
+                        FROM pg_constraint
+                        WHERE conname = 'fk_producto_empresa'
+                    ) THEN
+                        ALTER TABLE producto
+                        ADD CONSTRAINT fk_producto_empresa
+                        FOREIGN KEY (id_empresa)
+                        REFERENCES empresa(id_empresa);
+                    END IF;
+                END $$;
                 """
             )
         )

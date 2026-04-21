@@ -1,4 +1,5 @@
 from app.schemas.empresa_schema import EmpresaCreate, EmpresaResponse, EmpresaUpdate
+from app.schemas.inventario_schema import TipoMovimientoResponse
 from app.schemas.producto_schema import (
 	CategoriaProductoCreate,
 	CategoriaProductoResponse,
@@ -27,6 +28,7 @@ __all__ = [
 	"EmpresaCreate",
 	"EmpresaResponse",
 	"EmpresaUpdate",
+	"TipoMovimientoResponse",
 	"CategoriaProductoCreate",
 	"CategoriaProductoResponse",
 	"CategoriaProductoUpdate",
