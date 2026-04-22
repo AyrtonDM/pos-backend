@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class TipoMovimientoResponse(BaseModel):
@@ -9,8 +9,14 @@ class TipoMovimientoResponse(BaseModel):
     descripcion: str | None
     direccion: str
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ProductoMovimientoResponse(BaseModel):
+    id_producto: int
+    nombre: str
+
+    model_config = ConfigDict(from_attributes=True)
 
 
 class MovimientoInventarioCreate(BaseModel):
@@ -20,7 +26,13 @@ class MovimientoInventarioCreate(BaseModel):
     observacion: str | None = None
 
 
+class ActualizarStockSucursalRequest(BaseModel):
+    stock_minimo: int | None = None
+    stock_maximo: int | None = None
+
+
 class MovimientoInventarioResponse(BaseModel):
+    id_movimiento: int = Field(validation_alias="id_movimiento_inventario")
     id_movimiento_inventario: int
     id_producto: int
     id_tipo_movimiento: int
@@ -30,10 +42,10 @@ class MovimientoInventarioResponse(BaseModel):
     observacion: str | None
     fecha_movimiento: datetime
     stock_actual: int
+    producto: ProductoMovimientoResponse | None = None
     tipo_movimiento: TipoMovimientoResponse | None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
 
 class StockProductoResponse(BaseModel):
@@ -50,5 +62,4 @@ class StockProductoResponse(BaseModel):
     imagen: str | None
     activo: bool
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

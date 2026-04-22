@@ -273,7 +273,10 @@ class SucursalService:
         if usuario_rol_existente is not None:
             return {
                 "mensaje": "La invitacion ya fue aceptada anteriormente.",
+                "ya_aceptada": True,
                 "id_usuario_rol": usuario_rol_existente.id_usuario_rol,
+                "empresa": sucursal.empresa.nombre if sucursal.empresa else "",
+                "sucursal": sucursal.nombre,
             }
 
         try:
@@ -296,11 +299,14 @@ class SucursalService:
 
         return {
             "mensaje": "Invitacion aceptada correctamente.",
+            "ya_aceptada": False,
             "id_usuario_rol": usuario_rol.id_usuario_rol,
             "id_usuario": usuario_rol.id_usuario,
             "id_empresa": usuario_rol.id_empresa,
             "id_sucursal": usuario_rol.id_sucursal,
             "id_rol": usuario_rol.id_rol,
+            "empresa": sucursal.empresa.nombre if sucursal.empresa else "",
+            "sucursal": sucursal.nombre,
         }
 
     @staticmethod

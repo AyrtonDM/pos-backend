@@ -44,6 +44,22 @@ class InventarioRepository:
         )
 
     @staticmethod
+    def obtener_stock_por_producto_y_sucursal_con_producto(
+        db: Session,
+        id_producto: int,
+        id_sucursal: int,
+    ) -> Stock | None:
+        return (
+            db.query(Stock)
+            .options(joinedload(Stock.producto))
+            .filter(
+                Stock.id_producto == id_producto,
+                Stock.id_sucursal == id_sucursal,
+            )
+            .first()
+        )
+
+    @staticmethod
     def obtener_stocks_por_sucursal(
         db: Session,
         id_sucursal: int,
@@ -87,9 +103,31 @@ class InventarioRepository:
     ) -> MovimientoInventario | None:
         return (
             db.query(MovimientoInventario)
-            .options(joinedload(MovimientoInventario.tipo_movimiento))
+            .options(
+                joinedload(MovimientoInventario.tipo_movimiento),
+                joinedload(MovimientoInventario.producto),
+            )
             .filter(MovimientoInventario.id_movimiento_inventario == id_movimiento_inventario)
             .first()
+        )
+
+    @staticmethod
+    def obtener_movimientos_por_sucursal(
+        db: Session,
+        id_sucursal: int,
+    ) -> list[MovimientoInventario]:
+        return (
+            db.query(MovimientoInventario)
+            .options(
+                joinedload(MovimientoInventario.producto),
+                joinedload(MovimientoInventario.tipo_movimiento),
+            )
+            .filter(MovimientoInventario.id_sucursal == id_sucursal)
+            .order_by(
+                MovimientoInventario.fecha_movimiento.desc(),
+                MovimientoInventario.id_movimiento_inventario.desc(),
+            )
+            .all()
         )
 
     @staticmethod
