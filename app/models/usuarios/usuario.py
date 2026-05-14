@@ -23,3 +23,4 @@ class Usuario(Base):
     usuario_roles = relationship(
         "UsuarioRol", back_populates="usuario", cascade="all, delete-orphan"
     )
+    movimientos_inventario = relationship("MovimientoInventario", back_populates="usuario")

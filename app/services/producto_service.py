@@ -1,8 +1,12 @@
 # -*- coding: utf-8 -*-
+from datetime import datetime
+
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.repositories.empresa_repository import EmpresaRepository
 from app.models.usuarios.usuario import Usuario
+from app.services.inventario_service import InventarioService
 from app.repositories.producto_repository import ProductoRepository
 from app.schemas.producto_schema import (
     CategoriaProductoResponse,
@@ -37,10 +41,26 @@ class ProductoService:
     def _serializar_categoria(categoria) -> dict:
         return {
             "id_categoria_producto": categoria.id_categoria_producto,
+            "id_empresa": categoria.id_empresa,
             "nombre": categoria.nombre,
             "descripcion": categoria.descripcion,
             "activo": categoria.activo,
         }
+
+    @staticmethod
+    def _validar_empresa_del_usuario(
+        db: Session,
+        current_user: Usuario,
+        id_empresa: int,
+    ) -> None:
+        ProductoService._validar_usuario_activo(current_user)
+        empresa = EmpresaRepository.obtener_empresa_por_usuario(
+            db=db,
+            id_usuario=current_user.id_usuario,
+            id_empresa=id_empresa,
+        )
+        if empresa is None:
+            raise LookupError("Empresa no encontrada para este usuario.")
 
     @staticmethod
     def _serializar_subcategoria(subcategoria) -> dict:
@@ -56,6 +76,7 @@ class ProductoService:
     def _serializar_producto(producto) -> dict:
         return {
             "id_producto": producto.id_producto,
+            "id_empresa": producto.id_empresa,
             "id_subcategoria": producto.id_subcategoria,
             "nombre": producto.nombre,
             "descripcion": producto.descripcion,
@@ -76,11 +97,28 @@ class ProductoService:
         return [CategoriaProductoResponse.model_validate(ProductoService._serializar_categoria(categoria)) for categoria in categorias]
 
     @staticmethod
-    def crear_categoria(db: Session, nombre: str, descripcion: str | None, activo: bool) -> CategoriaProductoResponse:
+    def crear_categoria(
+        db: Session,
+        current_user: Usuario,
+        id_empresa: int,
+        nombre: str,
+        descripcion: str | None,
+        activo: bool,
+    ) -> CategoriaProductoResponse:
+        ProductoService._validar_empresa_del_usuario(
+            db=db,
+            current_user=current_user,
+            id_empresa=id_empresa,
+        )
         try:
             categoria = ProductoRepository.crear_categoria(
                 db=db,
-                datos={"nombre": nombre, "descripcion": descripcion, "activo": activo},
+                datos={
+                    "id_empresa": id_empresa,
+                    "nombre": nombre,
+                    "descripcion": descripcion,
+                    "activo": activo,
+                },
             )
             db.commit()
             db.refresh(categoria)
@@ -126,6 +164,23 @@ class ProductoService:
     @staticmethod
     def listar_subcategorias(db: Session):
         subcategorias = ProductoRepository.obtener_subcategorias(db)
+        return [SubcategoriaProductoResponse.model_validate(ProductoService._serializar_subcategoria(subcategoria)) for subcategoria in subcategorias]
+
+    @staticmethod
+    def listar_subcategorias_por_empresa(
+        db: Session,
+        current_user: Usuario,
+        id_empresa: int,
+    ):
+        ProductoService._validar_empresa_del_usuario(
+            db=db,
+            current_user=current_user,
+            id_empresa=id_empresa,
+        )
+        subcategorias = ProductoRepository.obtener_subcategorias_por_empresa(
+            db=db,
+            id_empresa=id_empresa,
+        )
         return [SubcategoriaProductoResponse.model_validate(ProductoService._serializar_subcategoria(subcategoria)) for subcategoria in subcategorias]
 
     @staticmethod
@@ -205,18 +260,29 @@ class ProductoService:
     def crear_producto(
         db: Session,
         current_user: Usuario,
+        id_empresa: int,
         payload: ProductoCreate,
         imagen: str | None = None,
     ) -> ProductoResponse:
-        ProductoService._validar_usuario_activo(current_user)
+        ProductoService._validar_empresa_del_usuario(
+            db=db,
+            current_user=current_user,
+            id_empresa=id_empresa,
+        )
 
         subcategoria = ProductoRepository.obtener_subcategoria_por_id(db, payload.id_subcategoria)
         ProductoService._validar_subcategoria_activa(subcategoria)
+        if (
+            subcategoria.categoria_producto is None
+            or subcategoria.categoria_producto.id_empresa != id_empresa
+        ):
+            raise ValueError("La subcategoria no pertenece a la empresa indicada.")
 
         try:
             producto = ProductoRepository.crear_producto(
                 db=db,
                 datos={
+                    "id_empresa": id_empresa,
                     "id_subcategoria": payload.id_subcategoria,
                     "nombre": payload.nombre,
                     "descripcion": payload.descripcion,
@@ -225,6 +291,12 @@ class ProductoService:
                     "imagen": imagen,
                     "activo": True,
                 },
+            )
+            InventarioService.sincronizar_stocks_por_producto(
+                db=db,
+                id_producto=producto.id_producto,
+                id_empresa=id_empresa,
+                fecha_actualizacion=datetime.now(),
             )
             db.commit()
             producto = ProductoRepository.obtener_producto_por_id(db, producto.id_producto)

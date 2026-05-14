@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import os
 from datetime import date
+from datetime import datetime
 
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -9,6 +10,7 @@ from app.models.usuarios import Usuario
 from app.repositories.empresa_repository import EmpresaRepository
 from app.repositories.sucursal_repository import SucursalRepository
 from app.repositories.usuario_repository import UsuarioRepository
+from app.services.inventario_service import InventarioService
 from app.utils.email_service import send_employee_invitation_email
 
 
@@ -90,6 +92,11 @@ class SucursalService:
                     activo=True,
                 )
 
+            InventarioService.sincronizar_stocks_por_sucursal(
+                db=db,
+                id_sucursal=sucursal.id_sucursal,
+                fecha_actualizacion=datetime.now(),
+            )
             db.commit()
             db.refresh(sucursal)
             return sucursal
@@ -266,7 +273,10 @@ class SucursalService:
         if usuario_rol_existente is not None:
             return {
                 "mensaje": "La invitacion ya fue aceptada anteriormente.",
+                "ya_aceptada": True,
                 "id_usuario_rol": usuario_rol_existente.id_usuario_rol,
+                "empresa": sucursal.empresa.nombre if sucursal.empresa else "",
+                "sucursal": sucursal.nombre,
             }
 
         try:
@@ -289,11 +299,14 @@ class SucursalService:
 
         return {
             "mensaje": "Invitacion aceptada correctamente.",
+            "ya_aceptada": False,
             "id_usuario_rol": usuario_rol.id_usuario_rol,
             "id_usuario": usuario_rol.id_usuario,
             "id_empresa": usuario_rol.id_empresa,
             "id_sucursal": usuario_rol.id_sucursal,
             "id_rol": usuario_rol.id_rol,
+            "empresa": sucursal.empresa.nombre if sucursal.empresa else "",
+            "sucursal": sucursal.nombre,
         }
 
     @staticmethod

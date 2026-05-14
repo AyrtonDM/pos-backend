@@ -22,6 +22,15 @@ class ProductoRepository:
         return db.query(CategoriaProducto).order_by(CategoriaProducto.nombre.asc()).all()
 
     @staticmethod
+    def obtener_categorias_por_empresa(db: Session, id_empresa: int) -> list[CategoriaProducto]:
+        return (
+            db.query(CategoriaProducto)
+            .filter(CategoriaProducto.id_empresa == id_empresa)
+            .order_by(CategoriaProducto.nombre.asc())
+            .all()
+        )
+
+    @staticmethod
     def actualizar_categoria(categoria: CategoriaProducto, datos: dict, db: Session) -> CategoriaProducto:
         for campo, valor in datos.items():
             setattr(categoria, campo, valor)
@@ -46,6 +55,17 @@ class ProductoRepository:
         return (
             db.query(SubcategoriaProducto)
             .options(joinedload(SubcategoriaProducto.categoria_producto))
+            .order_by(SubcategoriaProducto.nombre.asc())
+            .all()
+        )
+
+    @staticmethod
+    def obtener_subcategorias_por_empresa(db: Session, id_empresa: int) -> list[SubcategoriaProducto]:
+        return (
+            db.query(SubcategoriaProducto)
+            .options(joinedload(SubcategoriaProducto.categoria_producto))
+            .join(CategoriaProducto, CategoriaProducto.id_categoria_producto == SubcategoriaProducto.id_categoria_producto)
+            .filter(CategoriaProducto.id_empresa == id_empresa)
             .order_by(SubcategoriaProducto.nombre.asc())
             .all()
         )

@@ -15,5 +15,7 @@ class Empresa(Base):
     fecha_creacion = Column(Date, nullable=False)
     activo = Column(Boolean, default=True, nullable=False)
 
+    categorias_producto = relationship("CategoriaProducto", back_populates="empresa")
+    productos = relationship("Producto", back_populates="empresa")
     sucursales = relationship("Sucursal", back_populates="empresa", cascade="all, delete-orphan")
     usuario_roles = relationship("UsuarioRol", back_populates="empresa")

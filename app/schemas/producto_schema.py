@@ -21,6 +21,7 @@ class CategoriaProductoUpdate(BaseModel):
 
 class CategoriaProductoResponse(BaseModel):
     id_categoria_producto: int
+    id_empresa: int | None
     nombre: str
     descripcion: str | None
     activo: bool
@@ -82,6 +83,7 @@ class ProductoUpdate(BaseModel):
 
 class ProductoResponse(BaseModel):
     id_producto: int
+    id_empresa: int | None
     id_subcategoria: int | None
     nombre: str
     descripcion: str | None
