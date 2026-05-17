@@ -7,7 +7,7 @@ from fastapi.staticfiles import StaticFiles
 from app.core.database import Base, engine
 from app.core.database import SessionLocal
 from app.core.schema_updates import apply_schema_updates
-from app.models.empresas import Empresa, Sucursal
+from app.models.empresas import Caja, Empresa, Sucursal
 from app.models.inventario import MovimientoInventario, Stock, TipoMovimiento
 from app.models.productos import CategoriaProducto, Producto, SubcategoriaProducto
 from app.models.usuarios import Persona, Rol, Usuario, UsuarioRol

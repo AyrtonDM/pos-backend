@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from app.core.database import SessionLocal
 from app.core.security import get_current_user
 from app.models.usuarios import Usuario
+from app.schemas.caja_schema import CajaCreate, CajaResponse, CajaUpdate
 from app.schemas.sucursal_schema import (
     EmpleadoSucursalResponse,
     InvitacionEmpleadoCreate,
@@ -13,6 +14,7 @@ from app.schemas.sucursal_schema import (
     SucursalResponse,
     SucursalUpdate,
 )
+from app.services.caja_service import CajaService
 from app.services.sucursal_service import SucursalService
 
 empresa_router = APIRouter(prefix="/api/empresas", tags=["sucursales"])
@@ -145,6 +147,112 @@ def obtener_empleados_sucursal(
         raise HTTPException(status_code=400, detail=str(e))
     except Exception:
         raise HTTPException(status_code=500, detail="Error al obtener los empleados.")
+
+
+@sucursal_router.post("/{id_sucursal}/cajas", response_model=CajaResponse)
+def crear_caja(
+    id_sucursal: int,
+    datos: CajaCreate,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    try:
+        return CajaService.crear_caja(
+            db=db,
+            current_user=current_user,
+            id_sucursal=id_sucursal,
+            nombre=datos.nombre,
+            codigo=datos.codigo,
+        )
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception:
+        raise HTTPException(status_code=500, detail="Error al crear la caja.")
+
+
+@empresa_router.get(
+    "/{id_empresa}/sucursales/{id_sucursal}/cajas",
+    response_model=list[CajaResponse],
+)
+def listar_cajas_sucursal(
+    id_empresa: int,
+    id_sucursal: int,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    try:
+        return CajaService.listar_cajas_de_sucursal(
+            db=db,
+            current_user=current_user,
+            id_empresa=id_empresa,
+            id_sucursal=id_sucursal,
+        )
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception:
+        raise HTTPException(status_code=500, detail="Error al listar las cajas.")
+
+
+@empresa_router.get(
+    "/{id_empresa}/sucursales/{id_sucursal}/cajas/{id_caja}",
+    response_model=CajaResponse,
+)
+def obtener_caja_sucursal(
+    id_empresa: int,
+    id_sucursal: int,
+    id_caja: int,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    try:
+        return CajaService.obtener_caja(
+            db=db,
+            current_user=current_user,
+            id_empresa=id_empresa,
+            id_sucursal=id_sucursal,
+            id_caja=id_caja,
+        )
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception:
+        raise HTTPException(status_code=500, detail="Error al obtener la caja.")
+
+
+@empresa_router.put(
+    "/{id_empresa}/sucursales/{id_sucursal}/cajas/{id_caja}",
+    response_model=CajaResponse,
+)
+def actualizar_caja_sucursal(
+    id_empresa: int,
+    id_sucursal: int,
+    id_caja: int,
+    datos: CajaUpdate,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    try:
+        return CajaService.actualizar_caja(
+            db=db,
+            current_user=current_user,
+            id_empresa=id_empresa,
+            id_sucursal=id_sucursal,
+            id_caja=id_caja,
+            nombre=datos.nombre,
+            codigo=datos.codigo,
+            activo=datos.activo,
+        )
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception:
+        raise HTTPException(status_code=500, detail="Error al actualizar la caja.")
 
 
 @sucursal_router.put("/{id_sucursal}", response_model=SucursalResponse)

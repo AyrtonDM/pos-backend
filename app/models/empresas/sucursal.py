@@ -18,5 +18,6 @@ class Sucursal(Base):
 
     empresa = relationship("Empresa", back_populates="sucursales")
     usuario_roles = relationship("UsuarioRol", back_populates="sucursal")
+    cajas = relationship("Caja", back_populates="sucursal", cascade="all, delete-orphan")
     stocks = relationship("Stock", back_populates="sucursal", cascade="all, delete-orphan")
     movimientos_inventario = relationship("MovimientoInventario", back_populates="sucursal")
