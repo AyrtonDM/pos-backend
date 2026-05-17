@@ -46,6 +46,25 @@ def obtener_empresas_del_usuario(
         raise HTTPException(status_code=500, detail="Error al obtener las empresas.")
 
 
+@router.get("/mis-empresas-empleado", response_model=list[EmpresaResponse])
+def obtener_empresas_del_usuario_como_empleado(
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    try:
+        return EmpresaService.obtener_empresas_del_usuario_como_empleado(
+            db=db,
+            current_user=current_user,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception:
+        raise HTTPException(
+            status_code=500,
+            detail="Error al obtener las empresas del empleado.",
+        )
+
+
 @router.get("/{id_empresa}", response_model=EmpresaResponse)
 def obtener_empresa_del_usuario(
     id_empresa: int,

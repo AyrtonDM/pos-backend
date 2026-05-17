@@ -282,10 +282,11 @@ def actualizar_sucursal(
 
 
 @sucursal_router.get(
-    "/mis-sucursales-empleado",
+    "/mis-sucursales-empleado/{id_empresa}",
     response_model=list[SucursalEmpleadoAsignadaResponse],
 )
 def obtener_mis_sucursales_empleado(
+    id_empresa: int,
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(get_current_user),
 ):
@@ -293,7 +294,10 @@ def obtener_mis_sucursales_empleado(
         return SucursalService.obtener_sucursales_asignadas_como_empleado(
             db=db,
             current_user=current_user,
+            id_empresa=id_empresa,
         )
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception:

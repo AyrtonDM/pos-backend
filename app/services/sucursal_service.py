@@ -335,8 +335,16 @@ class SucursalService:
     def obtener_sucursales_asignadas_como_empleado(
         db: Session,
         current_user: Usuario,
+        id_empresa: int | None = None,
     ):
         SucursalService._validar_usuario_activo(current_user)
+
+        if id_empresa is not None:
+            SucursalService._validar_empresa_del_usuario(
+                db=db,
+                current_user=current_user,
+                id_empresa=id_empresa,
+            )
 
         rol_empleado = EmpresaRepository.obtener_rol_por_nombre(
             db=db,
@@ -349,4 +357,5 @@ class SucursalService:
             db=db,
             id_usuario=current_user.id_usuario,
             id_rol=rol_empleado.id_rol,
+            id_empresa=id_empresa,
         )
