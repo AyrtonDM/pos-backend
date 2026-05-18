@@ -22,6 +22,10 @@ class InvitacionEmpleadoCreate(BaseModel):
     email: EmailStr
 
 
+class InvitacionClienteCreate(BaseModel):
+    email: EmailStr
+
+
 class PersonaEmpleadoResponse(BaseModel):
     id_persona: int
     nombre_completo: str
@@ -50,6 +54,19 @@ class EmpleadoSucursalResponse(BaseModel):
     id_rol: int
     id_empresa: int
     id_sucursal: int
+    activo: bool
+    usuario: UsuarioEmpleadoResponse
+
+    class Config:
+        from_attributes = True
+
+
+class ClienteEmpresaResponse(BaseModel):
+    id_usuario_rol: int
+    id_usuario: int
+    id_rol: int
+    id_empresa: int
+    id_sucursal: int | None
     activo: bool
     usuario: UsuarioEmpleadoResponse
 

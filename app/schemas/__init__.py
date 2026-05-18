@@ -13,8 +13,10 @@ from app.schemas.producto_schema import (
 )
 from app.schemas.sucursal_schema import (
 	EmpleadoSucursalResponse,
+	ClienteEmpresaResponse,
 	EmpresaEmpleadoResponse,
 	InvitacionEmpleadoCreate,
+	InvitacionClienteCreate,
 	PersonaEmpleadoResponse,
 	SucursalCreate,
 	SucursalEmpleadoAsignadaResponse,
@@ -42,9 +44,11 @@ __all__ = [
 	"SucursalResponse",
 	"SucursalUpdate",
 	"InvitacionEmpleadoCreate",
+	"InvitacionClienteCreate",
 	"PersonaEmpleadoResponse",
 	"UsuarioEmpleadoResponse",
 	"EmpleadoSucursalResponse",
+	"ClienteEmpresaResponse",
 	"EmpresaEmpleadoResponse",
 	"SucursalEmpleadoResponse",
 	"SucursalEmpleadoAsignadaResponse",

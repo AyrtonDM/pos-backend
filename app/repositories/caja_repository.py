@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from sqlalchemy.orm import Session
 
-from app.models.empresas import Caja
+from app.models.empresas import Caja, CajaSesion
 
 
 class CajaRepository:
@@ -35,6 +35,18 @@ class CajaRepository:
             )
             .first()
         )
+
+    @staticmethod
+    def obtener_caja_por_id(db: Session, id_caja: int) -> Caja | None:
+        return db.query(Caja).filter(Caja.id_caja == id_caja).first()
+
+    @staticmethod
+    def crear_caja_sesion(db: Session, datos: dict) -> CajaSesion:
+        caja_sesion = CajaSesion(**datos)
+        db.add(caja_sesion)
+        db.flush()
+        db.refresh(caja_sesion)
+        return caja_sesion
 
     @staticmethod
     def actualizar_caja(caja: Caja, datos: dict, db: Session) -> Caja:

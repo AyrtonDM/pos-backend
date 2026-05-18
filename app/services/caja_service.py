@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
-from datetime import date
+from datetime import date, datetime
+from decimal import Decimal
 
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -187,3 +188,46 @@ class CajaService:
                 "activo": activo,
             },
         )
+
+    @staticmethod
+    def crear_caja_sesion(
+        db: Session,
+        current_user: Usuario,
+        id_caja: int,
+        monto_inicial: Decimal,
+        nota: str | None,
+    ):
+        CajaService._validar_usuario_activo(current_user)
+
+        caja = CajaRepository.obtener_caja_por_id(db=db, id_caja=id_caja)
+        if caja is None:
+            raise LookupError("Caja no encontrada.")
+
+        CajaService._validar_empresa_del_usuario(
+            db=db,
+            current_user=current_user,
+            id_empresa=caja.sucursal.id_empresa,
+        )
+
+        try:
+            caja_sesion = CajaRepository.crear_caja_sesion(
+                db=db,
+                datos={
+                    "id_caja": id_caja,
+                    "fecha_apertura": datetime.utcnow(),
+                    "fecha_cierre": None,
+                    "monto_inicial": monto_inicial,
+                    "monto_final": None,
+                    "estado": "Abierto",
+                    "nota": nota,
+                },
+            )
+            db.commit()
+            db.refresh(caja_sesion)
+            return caja_sesion
+        except IntegrityError as exc:
+            db.rollback()
+            raise ValueError("No se pudo crear la sesion de caja.") from exc
+        except Exception:
+            db.rollback()
+            raise

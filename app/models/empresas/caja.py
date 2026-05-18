@@ -17,3 +17,8 @@ class Caja(Base):
     activo = Column(Boolean, default=True, nullable=False)
 
     sucursal = relationship("Sucursal", back_populates="cajas")
+    sesiones = relationship(
+        "CajaSesion",
+        back_populates="caja",
+        cascade="all, delete-orphan",
+    )
