@@ -20,6 +20,7 @@ from app.routers.sucursal_router import (
     invitacion_router,
     sucursal_router,
 )
+from app.routers.notifications_router import router as notifications_router
 from app.seeds import run_seeds
 from app.services.inventario_service import InventarioService
 
@@ -44,6 +45,7 @@ app.include_router(producto_router)
 app.include_router(sucursal_empresa_router)
 app.include_router(sucursal_router)
 app.include_router(invitacion_router)
+app.include_router(notifications_router)
 
 media_root = Path(__file__).resolve().parent / "media"
 media_root.mkdir(parents=True, exist_ok=True)

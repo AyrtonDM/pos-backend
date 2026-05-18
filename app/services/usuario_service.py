@@ -112,7 +112,16 @@ class UsuarioService:
         if not usuario.activo:
             raise ValueError("Usuario no encontrado o inactivo")
 
-        token = create_access_token(user_id=usuario.id_usuario, email=usuario.email)
+        # collect roles from usuario.usuario_roles relationship
+        roles = []
+        try:
+            for ur in usuario.usuario_roles:
+                if ur.rol and getattr(ur.rol, 'nombre', None):
+                    roles.append(ur.rol.nombre)
+        except Exception:
+            roles = []
+
+        token = create_access_token(user_id=usuario.id_usuario, email=usuario.email, roles=roles)
         return {
             "access_token": token,
             "token_type": "bearer",
