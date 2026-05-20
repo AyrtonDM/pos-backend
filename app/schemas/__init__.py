@@ -1,3 +1,11 @@
+from app.schemas.cliente_schema import (
+	CategoriaClienteCreate,
+	CategoriaClienteResponse,
+	CategoriaClienteUpdate,
+	ClienteCreate,
+	ClienteResponse,
+	ClienteUpdate,
+)
 from app.schemas.empresa_schema import EmpresaCreate, EmpresaResponse, EmpresaUpdate
 from app.schemas.inventario_schema import TipoMovimientoResponse
 from app.schemas.producto_schema import (
@@ -27,6 +35,12 @@ from app.schemas.sucursal_schema import (
 )
 
 __all__ = [
+	"CategoriaClienteCreate",
+	"CategoriaClienteResponse",
+	"CategoriaClienteUpdate",
+	"ClienteCreate",
+	"ClienteResponse",
+	"ClienteUpdate",
 	"EmpresaCreate",
 	"EmpresaResponse",
 	"EmpresaUpdate",

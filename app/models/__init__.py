@@ -1,3 +1,5 @@
+from app.models.clientes.categoria_cliente import CategoriaCliente
+from app.models.clientes.cliente import Cliente
 from app.models.empresas.caja import Caja
 from app.models.empresas.caja_sesion import CajaSesion
 from app.models.empresas.empresa import Empresa
@@ -10,6 +12,8 @@ from app.models.usuarios.usuario import Usuario
 from app.models.usuarios.usuario_rol import UsuarioRol
 
 __all__ = [
+	"CategoriaCliente",
+	"Cliente",
 	"Persona",
 	"Usuario",
 	"Rol",
