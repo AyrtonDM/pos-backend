@@ -16,7 +16,6 @@ class Empresa(Base):
     activo = Column(Boolean, default=True, nullable=False)
 
     categorias_cliente = relationship("CategoriaCliente", back_populates="empresa", cascade="all, delete-orphan")
-    clientes = relationship("Cliente", back_populates="empresa", cascade="all, delete-orphan")
     categorias_producto = relationship("CategoriaProducto", back_populates="empresa")
     productos = relationship("Producto", back_populates="empresa")
     sucursales = relationship("Sucursal", back_populates="empresa", cascade="all, delete-orphan")

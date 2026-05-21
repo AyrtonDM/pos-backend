@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 from fastapi import APIRouter, Depends, HTTPException
+import logging
 from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 

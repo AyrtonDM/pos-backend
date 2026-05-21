@@ -124,9 +124,9 @@ def update_category(
         raise HTTPException(status_code=500, detail="Error al actualizar la categoría de cliente.")
 
 
-@cliente_router.post("/{id_empresa}", response_model=ClienteResponse)
+@cliente_router.post("/{id_usuario}", response_model=ClienteResponse)
 def create_client(
-    id_empresa: int,
+    id_usuario: int,
     datos: ClienteCreate,
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(get_current_user),
@@ -135,7 +135,7 @@ def create_client(
         return ClienteService.crear_cliente(
             db=db,
             current_user=current_user,
-            id_empresa=id_empresa,
+            id_usuario=id_usuario,
             id_categoria_cliente=datos.id_categoria_cliente,
             codigo_cliente=datos.codigo_cliente,
             saldo_credito=datos.saldo_credito,
@@ -149,9 +149,9 @@ def create_client(
         raise HTTPException(status_code=500, detail="Error al crear el cliente.")
 
 
-@cliente_router.get("/{id_empresa}", response_model=list[ClienteResponse])
+@cliente_router.get("/{id_usuario}", response_model=list[ClienteResponse])
 def list_clients(
-    id_empresa: int,
+    id_usuario: int,
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(get_current_user),
 ):
@@ -159,7 +159,7 @@ def list_clients(
         return ClienteService.listar_clientes(
             db=db,
             current_user=current_user,
-            id_empresa=id_empresa,
+            id_usuario=id_usuario,
         )
     except LookupError as e:
         raise HTTPException(status_code=404, detail=str(e))
@@ -169,9 +169,9 @@ def list_clients(
         raise HTTPException(status_code=500, detail="Error al listar los clientes.")
 
 
-@cliente_router.get("/{id_empresa}/{id_cliente}", response_model=ClienteResponse)
+@cliente_router.get("/{id_usuario}/{id_cliente}", response_model=ClienteResponse)
 def get_client(
-    id_empresa: int,
+    id_usuario: int,
     id_cliente: int,
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(get_current_user),
@@ -180,7 +180,7 @@ def get_client(
         return ClienteService.obtener_cliente(
             db=db,
             current_user=current_user,
-            id_empresa=id_empresa,
+            id_usuario=id_usuario,
             id_cliente=id_cliente,
         )
     except LookupError as e:
@@ -191,9 +191,9 @@ def get_client(
         raise HTTPException(status_code=500, detail="Error al obtener el cliente.")
 
 
-@cliente_router.put("/{id_empresa}/{id_cliente}", response_model=ClienteResponse)
+@cliente_router.put("/{id_usuario}/{id_cliente}", response_model=ClienteResponse)
 def update_client(
-    id_empresa: int,
+    id_usuario: int,
     id_cliente: int,
     datos: ClienteUpdate,
     db: Session = Depends(get_db),
@@ -203,7 +203,7 @@ def update_client(
         return ClienteService.actualizar_cliente(
             db=db,
             current_user=current_user,
-            id_empresa=id_empresa,
+            id_usuario=id_usuario,
             id_cliente=id_cliente,
             id_categoria_cliente=datos.id_categoria_cliente,
             codigo_cliente=datos.codigo_cliente,

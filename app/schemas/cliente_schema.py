@@ -10,7 +10,6 @@ class CategoriaClienteBase(BaseModel):
     permite_credito: bool = True
     descuento_base: Decimal = Field(default=Decimal("0.00"), decimal_places=2)
     limite_credito: Decimal = Field(default=Decimal("0.00"), decimal_places=2)
-    activo: bool = True
 
 
 class CategoriaClienteCreate(CategoriaClienteBase):
@@ -62,11 +61,11 @@ class ClienteUpdate(BaseModel):
 
 class ClienteResponse(BaseModel):
     id_cliente: int
-    id_empresa: int
-    id_categoria_cliente: int
+    id_usuario: int
+    id_categoria_cliente: int | None
     codigo_cliente: str
-    saldo_credito: Decimal
-    limite_credito: Decimal
+    saldo_credito: Decimal | None
+    limite_credito: Decimal | None
     activo: bool
 
     class Config:

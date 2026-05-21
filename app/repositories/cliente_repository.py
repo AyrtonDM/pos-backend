@@ -67,8 +67,12 @@ class ClienteRepository:
         return db.query(Cliente).filter(Cliente.id_cliente == id_cliente).first()
 
     @staticmethod
-    def obtener_clientes_por_empresa(db: Session, id_empresa: int) -> list[Cliente]:
-        return db.query(Cliente).filter(Cliente.id_empresa == id_empresa).all()
+    def obtener_clientes_por_usuario(db: Session, id_usuario: int) -> list[Cliente]:
+        return db.query(Cliente).filter(Cliente.id_usuario == id_usuario).all()
+
+    @staticmethod
+    def obtener_cliente_por_usuario(db: Session, id_usuario: int) -> Cliente | None:
+        return db.query(Cliente).filter(Cliente.id_usuario == id_usuario).first()
 
     @staticmethod
     def obtener_clientes_por_categoria(

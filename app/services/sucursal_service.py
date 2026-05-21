@@ -10,6 +10,7 @@ from app.models.usuarios import Usuario
 from app.repositories.empresa_repository import EmpresaRepository
 from app.repositories.sucursal_repository import SucursalRepository
 from app.repositories.usuario_repository import UsuarioRepository
+from app.repositories.cliente_repository import ClienteRepository
 from app.services.inventario_service import InventarioService
 from app.utils.email_service import (
     send_client_invitation_email,
@@ -417,6 +418,29 @@ class SucursalService:
             )
             db.commit()
             db.refresh(usuario_rol)
+
+            # Crear registro en la tabla cliente asociado al usuario
+            try:
+                cliente = ClienteRepository.crear_cliente(
+                    db=db,
+                    datos={
+                        "id_usuario": id_usuario,
+                        "id_categoria_cliente": None,
+                        "codigo_cliente": "CLI-TEMP",
+                        "saldo_credito": None,
+                        "limite_credito": None,
+                        "activo": True,
+                    },
+                )
+                # Asignar codigo definitivo basado en id_cliente (3 dígitos)
+                cliente.codigo_cliente = f"CLI-{cliente.id_cliente:03d}"
+                db.commit()
+                db.refresh(cliente)
+            except Exception:
+                db.rollback()
+                # No interrumpimos la aceptación si falla la creación del cliente,
+                # pero propagamos el error para que se pueda investigar.
+                raise
         except IntegrityError as exc:
             db.rollback()
             raise ValueError("No se pudo aceptar la invitacion.") from exc
@@ -481,11 +505,30 @@ class SucursalService:
         if rol_cliente is None:
             raise ValueError("No existe el rol CLIENTE.")
 
-        return EmpresaRepository.obtener_usuarios_rol_por_empresa_y_rol_sin_sucursal(
+        usuarios_rol = EmpresaRepository.obtener_usuarios_rol_por_empresa_y_rol_sin_sucursal(
             db=db,
             id_empresa=id_empresa,
             id_rol=rol_cliente.id_rol,
         )
+
+        # Para cada usuario_rol, adjuntar el cliente (registro único de la tabla cliente) asociado al usuario
+        resultado = []
+        for ur in usuarios_rol:
+            cliente = ClienteRepository.obtener_cliente_por_usuario(db=db, id_usuario=ur.id_usuario)
+            resultado.append(
+                {
+                    "id_usuario_rol": ur.id_usuario_rol,
+                    "id_usuario": ur.id_usuario,
+                    "id_rol": ur.id_rol,
+                    "id_empresa": ur.id_empresa,
+                    "id_sucursal": ur.id_sucursal,
+                    "activo": ur.activo,
+                    "usuario": ur.usuario,
+                    "cliente": cliente,
+                }
+            )
+
+        return resultado
 
     @staticmethod
     def obtener_sucursales_asignadas_como_empleado(

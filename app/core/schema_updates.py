@@ -164,3 +164,28 @@ def apply_schema_updates() -> None:
                 """
             )
         )
+        # Asegurar que saldo_credito y limite_credito permiten NULL
+        connection.execute(
+            text(
+                """
+                DO $$
+                BEGIN
+                    -- quitar NOT NULL si existe
+                    IF EXISTS (
+                        SELECT 1
+                        FROM information_schema.columns
+                        WHERE table_name='cliente' AND column_name='saldo_credito' AND is_nullable='NO'
+                    ) THEN
+                        ALTER TABLE cliente ALTER COLUMN saldo_credito DROP NOT NULL;
+                    END IF;
+                    IF EXISTS (
+                        SELECT 1
+                        FROM information_schema.columns
+                        WHERE table_name='cliente' AND column_name='limite_credito' AND is_nullable='NO'
+                    ) THEN
+                        ALTER TABLE cliente ALTER COLUMN limite_credito DROP NOT NULL;
+                    END IF;
+                END $$;
+                """
+            )
+        )

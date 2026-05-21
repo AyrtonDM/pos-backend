@@ -2,6 +2,8 @@ from datetime import date
 
 from pydantic import BaseModel, EmailStr
 
+from app.schemas.cliente_schema import ClienteResponse
+
 
 class SucursalCreate(BaseModel):
     nombre: str
@@ -69,6 +71,7 @@ class ClienteEmpresaResponse(BaseModel):
     id_sucursal: int | None
     activo: bool
     usuario: UsuarioEmpleadoResponse
+    cliente: ClienteResponse | None = None
 
     class Config:
         from_attributes = True
