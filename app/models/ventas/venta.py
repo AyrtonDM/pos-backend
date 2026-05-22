@@ -12,7 +12,7 @@ class Venta(Base):
 
     id_venta = Column(Integer, primary_key=True, index=True)
     id_tipo_venta = Column(ForeignKey("tipo_venta.id_tipo_venta"), nullable=False, index=True)
-    id_cliente = Column(ForeignKey("cliente.id_cliente"), nullable=False, index=True)
+    id_cliente = Column(ForeignKey("cliente.id_cliente"), nullable=True, index=True)
     id_caja_sesion = Column(ForeignKey("caja_sesion.id_caja_sesion"), nullable=False, index=True)
     id_usuario = Column(ForeignKey("usuario.id_usuario"), nullable=False, index=True)
 

@@ -6,9 +6,20 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.models.usuarios import Usuario
+from app.models.ventas import MetodoPago
 from app.repositories.caja_repository import CajaRepository
 from app.repositories.empresa_repository import EmpresaRepository
 from app.repositories.sucursal_repository import SucursalRepository
+from app.repositories.movimiento_caja_repository import MovimientoCajaRepository
+from app.models.empresas import TipoMovimientoCaja
+
+
+class CajaSesionAbiertaError(Exception):
+    def __init__(self, id_caja: int, id_caja_sesion: int, message: str):
+        self.id_caja = id_caja
+        self.id_caja_sesion = id_caja_sesion
+        self.message = message
+        super().__init__(message)
 
 
 class CajaService:
@@ -209,11 +220,34 @@ class CajaService:
             id_empresa=caja.sucursal.id_empresa,
         )
 
+        sesion_abierta_usuario = CajaRepository.obtener_sesion_abierta_por_usuario(
+            db=db,
+            id_usuario=current_user.id_usuario,
+        )
+        if sesion_abierta_usuario is not None:
+            raise CajaSesionAbiertaError(
+                id_caja=sesion_abierta_usuario.id_caja,
+                id_caja_sesion=sesion_abierta_usuario.id_caja_sesion,
+                message="Tienes una sesion abierta aun",
+            )
+
+        sesion_abierta_caja = CajaRepository.obtener_sesion_abierta_por_caja(
+            db=db,
+            id_caja=id_caja,
+        )
+        if sesion_abierta_caja is not None:
+            raise CajaSesionAbiertaError(
+                id_caja=id_caja,
+                id_caja_sesion=sesion_abierta_caja.id_caja_sesion,
+                message="Esta caja tiene ya una sesion abierta",
+            )
+
         try:
             caja_sesion = CajaRepository.crear_caja_sesion(
                 db=db,
                 datos={
                     "id_caja": id_caja,
+                    "id_usuario": current_user.id_usuario,
                     "fecha_apertura": datetime.utcnow(),
                     "fecha_cierre": None,
                     "monto_inicial": monto_inicial,
@@ -231,3 +265,90 @@ class CajaService:
         except Exception:
             db.rollback()
             raise
+
+    @staticmethod
+    def crear_movimiento_caja(
+        db: Session,
+        current_user: Usuario,
+        id_caja_sesion: int,
+        concepto: str | None,
+        monto,
+        id_tipo_movimiento_caja: int,
+        id_metodo_pago: int | None,
+    ):
+        CajaService._validar_usuario_activo(current_user)
+
+        caja_sesion = CajaRepository.obtener_caja_sesion_por_id(
+            db=db, id_caja_sesion=id_caja_sesion
+        )
+        if caja_sesion is None:
+            raise LookupError("Sesion de caja no encontrada.")
+
+        # validar que la sesion pertenece a la empresa del usuario
+        CajaService._validar_empresa_del_usuario(
+            db=db,
+            current_user=current_user,
+            id_empresa=caja_sesion.caja.sucursal.id_empresa,
+        )
+
+        tipo = db.query(TipoMovimientoCaja).filter(
+            TipoMovimientoCaja.id_tipo_movimiento_caja == id_tipo_movimiento_caja
+        ).first()
+        if tipo is None:
+            raise LookupError("Tipo de movimiento de caja no encontrado.")
+
+        if id_metodo_pago is not None:
+            metodo_pago = db.query(MetodoPago).filter(
+                MetodoPago.id_metodo_pago == id_metodo_pago
+            ).first()
+            if metodo_pago is None:
+                raise LookupError("Metodo de pago no encontrado.")
+
+        try:
+            movimiento = MovimientoCajaRepository.crear_movimiento(
+                db=db,
+                datos={
+                    "id_metodo_pago": id_metodo_pago,
+                    "id_tipo_movimiento_caja": id_tipo_movimiento_caja,
+                    "id_caja_sesion": id_caja_sesion,
+                    "id_usuario": current_user.id_usuario,
+                    "fecha": datetime.utcnow(),
+                    "monto": monto,
+                    "concepto": concepto,
+                },
+            )
+            db.commit()
+            db.refresh(movimiento)
+            return movimiento
+        except IntegrityError as exc:
+            db.rollback()
+            raise ValueError("No se pudo registrar el movimiento de caja.") from exc
+        except Exception:
+            db.rollback()
+            raise
+
+    @staticmethod
+    def listar_movimientos_de_caja_sesion(
+        db: Session,
+        current_user: Usuario,
+        id_caja_sesion: int,
+    ):
+        CajaService._validar_usuario_activo(current_user)
+
+        caja_sesion = CajaRepository.obtener_caja_sesion_por_id(
+            db=db,
+            id_caja_sesion=id_caja_sesion,
+        )
+        if caja_sesion is None:
+            raise LookupError("Sesion de caja no encontrada.")
+
+        CajaService._validar_empresa_del_usuario(
+            db=db,
+            current_user=current_user,
+            id_empresa=caja_sesion.caja.sucursal.id_empresa,
+        )
+
+        return CajaRepository.obtener_movimientos_por_caja_sesion(
+            db=db,
+            id_caja_sesion=id_caja_sesion,
+        )

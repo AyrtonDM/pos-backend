@@ -45,6 +45,33 @@ def apply_schema_updates() -> None:
                 """
                 DO $$
                 BEGIN
+                    IF EXISTS (
+                        SELECT 1
+                        FROM information_schema.columns
+                        WHERE table_name = 'movimiento_caja'
+                          AND column_name = 'id_metodo_pago'
+                          AND is_nullable = 'NO'
+                    ) THEN
+                        ALTER TABLE movimiento_caja ALTER COLUMN id_metodo_pago DROP NOT NULL;
+                    END IF;
+                END $$;
+                """
+            )
+        )
+        connection.execute(
+            text(
+                """
+                ALTER TABLE movimiento_caja
+                ADD COLUMN IF NOT EXISTS monto NUMERIC(12, 2) DEFAULT 0,
+                ADD COLUMN IF NOT EXISTS concepto TEXT
+                """
+            )
+        )
+        connection.execute(
+            text(
+                """
+                DO $$
+                BEGIN
                     IF NOT EXISTS (
                         SELECT 1
                         FROM pg_constraint
@@ -52,6 +79,51 @@ def apply_schema_updates() -> None:
                     ) THEN
                         ALTER TABLE movimiento_inventario
                         ADD CONSTRAINT fk_movimiento_inventario_usuario
+                        FOREIGN KEY (id_usuario)
+                        REFERENCES usuario(id_usuario);
+                    END IF;
+                END $$;
+                """
+            )
+        )
+        connection.execute(
+            text(
+                """
+                DO $$
+                BEGIN
+                    IF EXISTS (
+                        SELECT 1
+                        FROM information_schema.columns
+                        WHERE table_name = 'venta'
+                          AND column_name = 'id_cliente'
+                          AND is_nullable = 'NO'
+                    ) THEN
+                        ALTER TABLE venta ALTER COLUMN id_cliente DROP NOT NULL;
+                    END IF;
+                END $$;
+                """
+            )
+        )
+        connection.execute(
+            text(
+                """
+                ALTER TABLE caja_sesion
+                ADD COLUMN IF NOT EXISTS id_usuario INTEGER
+                """
+            )
+        )
+        connection.execute(
+            text(
+                """
+                DO $$
+                BEGIN
+                    IF NOT EXISTS (
+                        SELECT 1
+                        FROM pg_constraint
+                        WHERE conname = 'fk_caja_sesion_usuario'
+                    ) THEN
+                        ALTER TABLE caja_sesion
+                        ADD CONSTRAINT fk_caja_sesion_usuario
                         FOREIGN KEY (id_usuario)
                         REFERENCES usuario(id_usuario);
                     END IF;

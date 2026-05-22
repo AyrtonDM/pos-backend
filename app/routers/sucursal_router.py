@@ -14,6 +14,10 @@ from app.schemas.caja_schema import (
     CajaSesionResponse,
     CajaUpdate,
 )
+from app.schemas.movimiento_caja_schema import (
+    MovimientoCajaCreate,
+    MovimientoCajaResponse,
+)
 from app.schemas.sucursal_schema import (
     ClienteEmpresaResponse,
     EmpleadoSucursalResponse,
@@ -24,7 +28,7 @@ from app.schemas.sucursal_schema import (
     SucursalResponse,
     SucursalUpdate,
 )
-from app.services.caja_service import CajaService
+from app.services.caja_service import CajaService, CajaSesionAbiertaError
 from app.services.sucursal_service import SucursalService
 
 empresa_router = APIRouter(prefix="/api/empresas", tags=["sucursales"])
@@ -280,10 +284,70 @@ def crear_caja_sesion(
         )
     except LookupError as e:
         raise HTTPException(status_code=404, detail=str(e))
+    except CajaSesionAbiertaError as e:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "id_caja": e.id_caja,
+                "id_caja_sesion": e.id_caja_sesion,
+                "detail": e.message,
+            },
+        )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception:
         raise HTTPException(status_code=500, detail="Error al crear la sesion de caja.")
+
+
+@caja_router.post(
+    "/sesiones/{id_caja_sesion}/movimientos",
+    response_model=MovimientoCajaResponse,
+)
+def crear_movimiento_caja(
+    id_caja_sesion: int,
+    datos: MovimientoCajaCreate,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    try:
+        return CajaService.crear_movimiento_caja(
+            db=db,
+            current_user=current_user,
+            id_caja_sesion=id_caja_sesion,
+            concepto=datos.concepto,
+            monto=datos.monto,
+            id_tipo_movimiento_caja=datos.id_tipo_movimiento_caja,
+            id_metodo_pago=datos.id_metodo_pago,
+        )
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception:
+        raise HTTPException(status_code=500, detail="Error al crear el movimiento de caja.")
+
+
+@caja_router.get(
+    "/sesiones/{id_caja_sesion}/movimientos",
+    response_model=list[MovimientoCajaResponse],
+)
+def listar_movimientos_caja_sesion(
+    id_caja_sesion: int,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    try:
+        return CajaService.listar_movimientos_de_caja_sesion(
+            db=db,
+            current_user=current_user,
+            id_caja_sesion=id_caja_sesion,
+        )
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception:
+        raise HTTPException(status_code=500, detail="Error al listar los movimientos de caja.")
 
 
 @empresa_router.get(

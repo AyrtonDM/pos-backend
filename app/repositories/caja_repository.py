@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from sqlalchemy.orm import Session
 
-from app.models.empresas import Caja, CajaSesion
+from app.models.empresas import Caja, CajaSesion, MovimientoCaja
 
 
 class CajaRepository:
@@ -39,6 +39,50 @@ class CajaRepository:
     @staticmethod
     def obtener_caja_por_id(db: Session, id_caja: int) -> Caja | None:
         return db.query(Caja).filter(Caja.id_caja == id_caja).first()
+
+    @staticmethod
+    def obtener_sesion_abierta_por_usuario(
+        db: Session,
+        id_usuario: int,
+    ) -> CajaSesion | None:
+        return (
+            db.query(CajaSesion)
+            .filter(
+                CajaSesion.id_usuario == id_usuario,
+                CajaSesion.estado == "Abierto",
+            )
+            .first()
+        )
+
+    @staticmethod
+    def obtener_caja_sesion_por_id(db: Session, id_caja_sesion: int) -> CajaSesion | None:
+        return db.query(CajaSesion).filter(CajaSesion.id_caja_sesion == id_caja_sesion).first()
+
+    @staticmethod
+    def obtener_movimientos_por_caja_sesion(
+        db: Session,
+        id_caja_sesion: int,
+    ) -> list[MovimientoCaja]:
+        return (
+            db.query(MovimientoCaja)
+            .filter(MovimientoCaja.id_caja_sesion == id_caja_sesion)
+            .order_by(MovimientoCaja.fecha.asc(), MovimientoCaja.id_movimiento_caja.asc())
+            .all()
+        )
+
+    @staticmethod
+    def obtener_sesion_abierta_por_caja(
+        db: Session,
+        id_caja: int,
+    ) -> CajaSesion | None:
+        return (
+            db.query(CajaSesion)
+            .filter(
+                CajaSesion.id_caja == id_caja,
+                CajaSesion.estado == "Abierto",
+            )
+            .first()
+        )
 
     @staticmethod
     def crear_caja_sesion(db: Session, datos: dict) -> CajaSesion:

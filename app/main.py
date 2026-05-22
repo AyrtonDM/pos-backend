@@ -26,6 +26,8 @@ from app.routers.empresa_router import router as empresa_router
 from app.routers.auth_router import router as auth_router
 from app.routers.inventario_router import router as inventario_router
 from app.routers.producto_router import router as producto_router
+from app.routers.venta_router import venta_router
+from app.routers.empresa_tipo_movimiento_caja_router import tipo_movimiento_caja_router
 from app.routers.sucursal_router import (
     caja_router,
     empresa_router as sucursal_empresa_router,
@@ -53,9 +55,11 @@ app.add_middleware(
 app.include_router(auth_router)
 app.include_router(categoria_cliente_router)
 app.include_router(cliente_router)
+app.include_router(tipo_movimiento_caja_router)
 app.include_router(empresa_router)
 app.include_router(inventario_router)
 app.include_router(producto_router)
+app.include_router(venta_router)
 app.include_router(caja_router)
 app.include_router(sucursal_empresa_router)
 app.include_router(sucursal_router)

@@ -27,6 +27,7 @@ class CajaSesion(Base):
 
     id_caja_sesion = Column(Integer, primary_key=True, index=True)
     id_caja = Column(ForeignKey("caja.id_caja"), nullable=False)
+    id_usuario = Column(ForeignKey("usuario.id_usuario"), nullable=False, index=True)
     fecha_apertura = Column(DateTime, default=datetime.utcnow, nullable=False)
     fecha_cierre = Column(DateTime, nullable=True)
     monto_inicial = Column(Numeric(12, 2), default=Decimal("0"), nullable=False)
@@ -35,6 +36,7 @@ class CajaSesion(Base):
     nota = Column(Text, nullable=True)
 
     caja = relationship("Caja", back_populates="sesiones")
+    usuario = relationship("Usuario", back_populates="caja_sesiones")
     ventas = relationship("Venta", back_populates="caja_sesion")
     movimientos_caja = relationship("MovimientoCaja", back_populates="caja_sesion")
     cierres_detalle = relationship("CajaCierreDetalle", back_populates="caja_sesion")

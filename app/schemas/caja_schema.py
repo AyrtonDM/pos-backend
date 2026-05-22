@@ -35,6 +35,7 @@ class CajaSesionCreate(BaseModel):
 class CajaSesionResponse(BaseModel):
     id_caja_sesion: int
     id_caja: int
+    id_usuario: int
     fecha_apertura: datetime
     fecha_cierre: datetime | None
     monto_inicial: Decimal
