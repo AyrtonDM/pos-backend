@@ -297,7 +297,7 @@ class InventarioService:
                         titulo=f'Stock bajo en "{stock.sucursal.nombre}"',
                         mensaje=(
                             f'El producto {stock.producto.nombre} tiene stock actual {stock.cantidad} '
-                            f'y minimo {stock.stock_minimo} en {stock.sucursal.nombre}.'
+                            f'y el stock minimo es {stock.stock_minimo} en {stock.sucursal.nombre}.'
                         ),
                         payload={
                             "id_producto": str(stock.id_producto),
