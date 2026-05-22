@@ -26,3 +26,4 @@ class Cliente(Base):
 
     usuario = relationship("Usuario", back_populates="clientes")
     categoria_cliente = relationship("CategoriaCliente", back_populates="clientes")
+    ventas = relationship("Venta", back_populates="cliente")

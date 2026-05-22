@@ -35,3 +35,6 @@ class CajaSesion(Base):
     nota = Column(Text, nullable=True)
 
     caja = relationship("Caja", back_populates="sesiones")
+    ventas = relationship("Venta", back_populates="caja_sesion")
+    movimientos_caja = relationship("MovimientoCaja", back_populates="caja_sesion")
+    cierres_detalle = relationship("CajaCierreDetalle", back_populates="caja_sesion")
