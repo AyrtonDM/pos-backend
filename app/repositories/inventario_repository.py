@@ -93,6 +93,26 @@ class InventarioRepository:
         )
 
     @staticmethod
+    def obtener_movimientos_por_sucursal(
+        db: Session,
+        id_sucursal: int,
+        skip: int = 0,
+        limit: int = 10,
+    ) -> list[MovimientoInventario]:
+        return (
+            db.query(MovimientoInventario)
+            .options(
+                joinedload(MovimientoInventario.tipo_movimiento),
+                joinedload(MovimientoInventario.producto),
+            )
+            .filter(MovimientoInventario.id_sucursal == id_sucursal)
+            .order_by(MovimientoInventario.fecha_movimiento.desc())
+            .offset(skip)
+            .limit(limit)
+            .all()
+        )
+
+    @staticmethod
     def sincronizar_stocks_por_producto(
         db: Session,
         id_producto: int,

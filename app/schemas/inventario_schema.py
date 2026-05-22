@@ -52,3 +52,26 @@ class StockProductoResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class MovimientoProductoSimple(BaseModel):
+    id_producto: int
+    nombre: str
+
+
+class TipoMovimientoSimple(BaseModel):
+    id_tipo_movimiento: int
+    nombre: str
+
+
+class MovimientoListResponse(BaseModel):
+    id_movimiento: int
+    id_producto: int
+    cantidad: int
+    observacion: str | None
+    tipo: str
+    producto: MovimientoProductoSimple
+    tipo_movimiento: TipoMovimientoSimple
+
+    class Config:
+        from_attributes = True

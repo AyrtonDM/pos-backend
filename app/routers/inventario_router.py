@@ -10,6 +10,7 @@ from app.schemas.inventario_schema import (
     StockProductoResponse,
     TipoMovimientoResponse,
 )
+from app.schemas.inventario_schema import MovimientoListResponse
 from app.services.inventario_service import InventarioService
 
 router = APIRouter(prefix="/api/inventario", tags=["inventario"])
@@ -81,3 +82,32 @@ def listar_stock_sucursal(
         raise HTTPException(status_code=400, detail=str(e))
     except Exception:
         raise HTTPException(status_code=500, detail="Error al listar el stock.")
+
+
+@router.get(
+    "/empresas/{id_empresa}/sucursales/{id_sucursal}/movimientos",
+    response_model=list[MovimientoListResponse],
+)
+def listar_movimientos_sucursal(
+    id_empresa: int,
+    id_sucursal: int,
+    skip: int = 0,
+    limit: int = 10,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    try:
+        return InventarioService.listar_movimientos_por_sucursal(
+            db=db,
+            current_user=current_user,
+            id_empresa=id_empresa,
+            id_sucursal=id_sucursal,
+            skip=skip,
+            limit=limit,
+        )
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception:
+        raise HTTPException(status_code=500, detail="Error al listar movimientos de inventario.")

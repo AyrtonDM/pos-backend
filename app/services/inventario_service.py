@@ -197,6 +197,69 @@ class InventarioService:
             raise
 
     @staticmethod
+    def listar_movimientos_por_sucursal(
+        db: Session,
+        current_user: Usuario,
+        id_empresa: int,
+        id_sucursal: int,
+        skip: int = 0,
+        limit: int = 10,
+    ) -> list[MovimientoInventarioResponse]:
+        InventarioService._validar_empresa_y_sucursal_del_usuario(
+            db=db,
+            current_user=current_user,
+            id_empresa=id_empresa,
+            id_sucursal=id_sucursal,
+        )
+
+        movimientos = InventarioRepository.obtener_movimientos_por_sucursal(
+            db=db,
+            id_sucursal=id_sucursal,
+            skip=skip,
+            limit=limit,
+        )
+
+        # Construir el formato solicitado por el cliente
+        from app.schemas.inventario_schema import (
+            MovimientoListResponse,
+            MovimientoProductoSimple,
+            TipoMovimientoSimple,
+        )
+
+        resultados: list[MovimientoListResponse] = []
+        for movimiento in movimientos:
+            tipo_dir = (
+                (movimiento.tipo_movimiento.direccion or "").strip().upper()
+                if movimiento.tipo_movimiento is not None
+                else ""
+            )
+            tipo_valor = "ENTRADA" if tipo_dir == "ENTRADA" else "SALIDA" if tipo_dir == "SALIDA" else tipo_dir
+
+            producto_simple = MovimientoProductoSimple(
+                id_producto=movimiento.id_producto,
+                nombre=movimiento.producto.nombre if movimiento.producto is not None else "",
+            )
+            tipo_mov_simple = None
+            if movimiento.tipo_movimiento is not None:
+                tipo_mov_simple = TipoMovimientoSimple(
+                    id_tipo_movimiento=movimiento.tipo_movimiento.id_tipo_movimiento,
+                    nombre=movimiento.tipo_movimiento.nombre,
+                )
+
+            item = MovimientoListResponse(
+                id_movimiento=movimiento.id_movimiento_inventario,
+                id_producto=movimiento.id_producto,
+                cantidad=movimiento.cantidad,
+                observacion=movimiento.observacion,
+                tipo=tipo_valor,
+                producto=producto_simple,
+                tipo_movimiento=tipo_mov_simple,
+            )
+            resultados.append(item)
+
+        return resultados
+
+    @staticmethod
     def sincronizar_stocks_iniciales(
         db: Session,
         fecha_actualizacion: datetime | None = None,
