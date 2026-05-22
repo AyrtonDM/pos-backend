@@ -1,7 +1,7 @@
 from typing import List, Optional
 from sqlalchemy.orm import Session
 from sqlalchemy import text
-from app.models.notifications import DispositivoToken, NotificacionHistorial
+from app.models.notifications.notifications import DispositivoToken, NotificacionHistorial
 from app.core.database import SessionLocal
 
 
