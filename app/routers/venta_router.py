@@ -4,6 +4,11 @@ from sqlalchemy.orm import Session
 from app.core.database import SessionLocal
 from app.models.ventas import MetodoPago, TipoVenta
 from app.schemas.venta_schema import MetodoPagoResponse, TipoVentaResponse
+from app.schemas.venta_schema import VentaCreate, VentaResponse
+from app.core.security import get_current_user
+from app.services.venta_service import VentaService
+from fastapi import Depends
+from app.models.usuarios.usuario import Usuario
 
 venta_router = APIRouter(prefix="/api/ventas", tags=["ventas"])
 
@@ -40,3 +45,21 @@ def listar_metodos_pago(db: Session = Depends(get_db)):
         return metodos
     except Exception:
         raise HTTPException(status_code=500, detail="Error al listar metodos de pago.")
+
+
+
+@venta_router.post("/sesiones/{id_caja_sesion}/ventas", response_model=VentaResponse)
+def crear_venta(id_caja_sesion: int, datos: VentaCreate, db: Session = Depends(get_db), current_user: Usuario = Depends(get_current_user)):
+    resultado = VentaService.crear_venta_completa(db=db, current_user=current_user, id_caja_sesion=id_caja_sesion, payload=datos)
+    return resultado["venta"]
+
+
+@venta_router.get("/sesiones/{id_caja_sesion}/ventas", response_model=list[VentaResponse])
+def historial_ventas(id_caja_sesion: int, db: Session = Depends(get_db), current_user: Usuario = Depends(get_current_user)):
+    try:
+        ventas = VentaService.obtener_historial_por_caja_sesion(db=db, current_user=current_user, id_caja_sesion=id_caja_sesion)
+        return ventas
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(status_code=500, detail="Error al obtener historial de ventas.")

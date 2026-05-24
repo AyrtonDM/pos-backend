@@ -8,11 +8,14 @@ from app.core.database import SessionLocal
 from app.core.security import get_current_user
 from app.models.usuarios import Usuario
 from app.schemas.caja_schema import (
+    CajaCierreDetalleCreate,
+    CajaSesionCierreResponse,
     CajaCreate,
     CajaResponse,
     CajaSesionCreate,
     CajaSesionResponse,
     CajaUpdate,
+    ResumenMovimientosCajaResponse,
 )
 from app.schemas.movimiento_caja_schema import (
     MovimientoCajaCreate,
@@ -348,6 +351,54 @@ def listar_movimientos_caja_sesion(
         raise HTTPException(status_code=400, detail=str(e))
     except Exception:
         raise HTTPException(status_code=500, detail="Error al listar los movimientos de caja.")
+
+
+@caja_router.get(
+    "/sesiones/{id_caja_sesion}/movimientos/resumen",
+    response_model=ResumenMovimientosCajaResponse,
+)
+def resumen_movimientos_caja_sesion(
+    id_caja_sesion: int,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    try:
+        return CajaService.resumen_movimientos_por_metodo_pago(
+            db=db,
+            current_user=current_user,
+            id_caja_sesion=id_caja_sesion,
+        )
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception:
+        raise HTTPException(status_code=500, detail="Error al obtener el resumen de movimientos de caja.")
+
+
+@caja_router.post(
+    "/sesiones/{id_caja_sesion}/cierres",
+    response_model=CajaSesionCierreResponse,
+)
+def cerrar_caja_sesion(
+    id_caja_sesion: int,
+    datos: list[CajaCierreDetalleCreate],
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    try:
+        return CajaService.cerrar_caja_sesion_con_detalles(
+            db=db,
+            current_user=current_user,
+            id_caja_sesion=id_caja_sesion,
+            cierres=[dato.model_dump() for dato in datos],
+        )
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception:
+        raise HTTPException(status_code=500, detail="Error al cerrar la sesion de caja.")
 
 
 @empresa_router.get(

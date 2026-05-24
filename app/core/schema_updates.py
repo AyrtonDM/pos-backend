@@ -261,3 +261,11 @@ def apply_schema_updates() -> None:
                 """
             )
         )
+        connection.execute(
+            text(
+                """
+                ALTER TABLE detalle_venta
+                ADD COLUMN IF NOT EXISTS descripcion TEXT
+                """
+            )
+        )

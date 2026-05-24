@@ -294,3 +294,64 @@ class InventarioService:
             id_sucursal=id_sucursal,
             fecha_actualizacion=fecha_actualizacion,
         )
+
+    @staticmethod
+    def actualizar_stock_producto(
+        db: Session,
+        current_user: Usuario,
+        id_empresa: int,
+        id_sucursal: int,
+        id_producto: int,
+        payload,
+    ) -> StockProductoResponse:
+        InventarioService._validar_empresa_y_sucursal_del_usuario(
+            db=db,
+            current_user=current_user,
+            id_empresa=id_empresa,
+            id_sucursal=id_sucursal,
+        )
+
+        producto = ProductoRepository.obtener_producto_por_id(db, id_producto)
+        if producto is None:
+            raise LookupError("Producto no encontrado.")
+        if producto.id_empresa != id_empresa:
+            raise ValueError("El producto no pertenece a la empresa indicada.")
+
+        fecha_actual = datetime.now()
+        stock = InventarioRepository.obtener_stock_por_producto_y_sucursal(
+            db=db,
+            id_producto=id_producto,
+            id_sucursal=id_sucursal,
+        )
+        if stock is None:
+            stock = InventarioRepository.crear_stock(
+                db=db,
+                datos={
+                    "id_producto": id_producto,
+                    "id_sucursal": id_sucursal,
+                    "cantidad": 0,
+                    "stock_minimo": payload.stock_minimo,
+                    "stock_maximo": payload.stock_maximo,
+                    "fecha_actualizacion": fecha_actual,
+                },
+            )
+        else:
+            stock = InventarioRepository.actualizar_stock(
+                stock=stock,
+                datos={
+                    "stock_minimo": payload.stock_minimo,
+                    "stock_maximo": payload.stock_maximo,
+                    "fecha_actualizacion": fecha_actual,
+                },
+                db=db,
+            )
+
+        # Persistir cambios en la base y refrescar el objeto
+        try:
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise
+        db.refresh(stock)
+
+        return StockProductoResponse.model_validate(InventarioService._serializar_stock(stock))

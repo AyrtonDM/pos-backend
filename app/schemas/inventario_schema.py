@@ -54,6 +54,14 @@ class StockProductoResponse(BaseModel):
         from_attributes = True
 
 
+class StockUpdateRequest(BaseModel):
+    stock_minimo: int
+    stock_maximo: int
+
+    class Config:
+        from_attributes = True
+
+
 class MovimientoProductoSimple(BaseModel):
     id_producto: int
     nombre: str

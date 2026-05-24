@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 from sqlalchemy.orm import Session
+from sqlalchemy.orm import joinedload
 
 from app.models.empresas import Caja, CajaSesion, MovimientoCaja
 
@@ -65,6 +66,7 @@ class CajaRepository:
     ) -> list[MovimientoCaja]:
         return (
             db.query(MovimientoCaja)
+            .options(joinedload(MovimientoCaja.metodo_pago), joinedload(MovimientoCaja.tipo_movimiento_caja))
             .filter(MovimientoCaja.id_caja_sesion == id_caja_sesion)
             .order_by(MovimientoCaja.fecha.asc(), MovimientoCaja.id_movimiento_caja.asc())
             .all()

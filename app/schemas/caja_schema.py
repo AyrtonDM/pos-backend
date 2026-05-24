@@ -3,6 +3,8 @@ from decimal import Decimal
 
 from pydantic import BaseModel
 
+from app.schemas.movimiento_caja_schema import MovimientoCajaResponse
+
 
 class CajaCreate(BaseModel):
     nombre: str
@@ -32,6 +34,27 @@ class CajaSesionCreate(BaseModel):
     nota: str | None = None
 
 
+class CajaCierreDetalleCreate(BaseModel):
+    id_metodo_pago: int
+    monto_esperado: Decimal
+    monto_real: Decimal
+    diferencia: Decimal
+    observacion: str | None = None
+
+
+class CajaCierreDetalleResponse(BaseModel):
+    id_caja_cierre_detalle: int
+    id_metodo_pago: int
+    id_caja_sesion: int
+    monto_esperado: Decimal
+    monto_real: Decimal
+    diferencia: Decimal
+    observacion: str | None
+
+    class Config:
+        from_attributes = True
+
+
 class CajaSesionResponse(BaseModel):
     id_caja_sesion: int
     id_caja: int
@@ -45,3 +68,32 @@ class CajaSesionResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class CajaSesionCierreResponse(BaseModel):
+    id_caja_sesion: int
+    monto_inicial: Decimal
+    monto_total_real: Decimal
+    monto_final: Decimal
+    estado: str
+    fecha_cierre: datetime
+    movimiento_cierre: MovimientoCajaResponse
+    cierres: list[CajaCierreDetalleResponse]
+
+    class Config:
+        from_attributes = True
+
+
+class MovimientoCajaPorMetodoPagoResponse(BaseModel):
+    id_metodo_pago: int | None
+    metodo_pago: str | None
+    total_ingresos: Decimal
+    total_egresos: Decimal
+    monto_esperado: Decimal
+    movimientos: list[MovimientoCajaResponse]
+
+
+class ResumenMovimientosCajaResponse(BaseModel):
+    id_caja_sesion: int
+    monto_esperado_total: Decimal
+    resumen_por_metodo_pago: list[MovimientoCajaPorMetodoPagoResponse]

@@ -14,6 +14,7 @@ from app.models.usuarios.rol import Rol
 from app.models.usuarios.usuario import Usuario
 from app.models.usuarios.usuario_rol import UsuarioRol
 from app.models.ventas import MetodoPago, TipoVenta, Venta, VentaPago
+from app.models.ventas import DetalleVenta
 
 __all__ = [
 	"CategoriaCliente",
@@ -39,4 +40,5 @@ __all__ = [
 	"TipoVenta",
 	"Venta",
 	"VentaPago",
+	"DetalleVenta",
 ]

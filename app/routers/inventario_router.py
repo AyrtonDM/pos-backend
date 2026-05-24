@@ -8,6 +8,7 @@ from app.schemas.inventario_schema import (
     MovimientoInventarioCreate,
     MovimientoInventarioResponse,
     StockProductoResponse,
+    StockUpdateRequest,
     TipoMovimientoResponse,
 )
 from app.schemas.inventario_schema import MovimientoListResponse
@@ -111,3 +112,32 @@ def listar_movimientos_sucursal(
         raise HTTPException(status_code=400, detail=str(e))
     except Exception:
         raise HTTPException(status_code=500, detail="Error al listar movimientos de inventario.")
+
+
+@router.put(
+    "/empresas/{id_empresa}/sucursales/{id_sucursal}/stock/{id_producto}",
+    response_model=StockProductoResponse,
+)
+def actualizar_stock_producto(
+    id_empresa: int,
+    id_sucursal: int,
+    id_producto: int,
+    datos: StockUpdateRequest,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    try:
+        return InventarioService.actualizar_stock_producto(
+            db=db,
+            current_user=current_user,
+            id_empresa=id_empresa,
+            id_sucursal=id_sucursal,
+            id_producto=id_producto,
+            payload=datos,
+        )
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception:
+        raise HTTPException(status_code=500, detail="Error al actualizar el stock.")

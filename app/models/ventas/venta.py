@@ -27,3 +27,4 @@ class Venta(Base):
     caja_sesion = relationship("CajaSesion", back_populates="ventas")
     usuario = relationship("Usuario", back_populates="ventas")
     pagos = relationship("VentaPago", back_populates="venta", cascade="all, delete-orphan")
+    detalles = relationship("DetalleVenta", back_populates="venta", cascade="all, delete-orphan")
