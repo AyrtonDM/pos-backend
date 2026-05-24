@@ -14,6 +14,7 @@ from app.schemas.inventario_schema import (
     StockUpdateRequest,
     TipoMovimientoResponse,
 )
+from app.services.notification_service import NotificationService
 
 
 class InventarioService:
@@ -272,6 +273,7 @@ class InventarioService:
                     "fecha_movimiento": fecha_actual,
                 },
             )
+            id_movimiento_creado = movimiento.id_movimiento_inventario
             stock = InventarioRepository.actualizar_stock(
                 stock=stock,
                 datos={
@@ -281,10 +283,48 @@ class InventarioService:
                 db=db,
             )
             db.commit()
-            movimiento = InventarioRepository.obtener_movimiento_por_id(
-                db=db,
-                id_movimiento_inventario=movimiento.id_movimiento_inventario,
-            )
+
+            if (
+                stock.stock_minimo is not None
+                and stock.cantidad <= stock.stock_minimo
+                and stock.producto is not None
+                and stock.sucursal is not None
+            ):
+                try:
+                    NotificationService.enviar_alerta(
+                        db=db,
+                        id_empresa=id_empresa,
+                        titulo=f'Stock bajo en "{stock.sucursal.nombre}"',
+                        mensaje=(
+                            f'El producto {stock.producto.nombre} tiene stock actual {stock.cantidad} '
+                            f'y el stock minimo es {stock.stock_minimo} en {stock.sucursal.nombre}.'
+                        ),
+                        payload={
+                            "id_producto": str(stock.id_producto),
+                            "id_sucursal": str(stock.id_sucursal),
+                            "nombre_sucursal": stock.sucursal.nombre,
+                            "direccion_sucursal": stock.sucursal.direccion,
+                            "nombre_producto": stock.producto.nombre,
+                            "stock_actual": stock.cantidad,
+                            "stock_minimo": stock.stock_minimo,
+                            "unidad_medida": stock.producto.unidad_medida,
+                        },
+                    )
+                except Exception:
+                    # The stock movement must not fail if alert delivery has a problem.
+                    pass
+            # Use a fresh session to read the movimiento after commit to avoid
+            # issues if the caller's session is in an aborted state.
+            from app.core.database import SessionLocal
+
+            read_session = SessionLocal()
+            try:
+                movimiento = InventarioRepository.obtener_movimiento_por_id(
+                    db=read_session,
+                    id_movimiento_inventario=id_movimiento_creado,
+                )
+            finally:
+                read_session.close()
             return MovimientoInventarioResponse.model_validate(
                 InventarioService._serializar_movimiento(
                     movimiento=movimiento,

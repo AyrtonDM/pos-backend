@@ -34,8 +34,8 @@ def get_db():
         db.close()
 
 
-def create_access_token(user_id: int, email: str) -> str:
-    """Crea un token JWT con expiracion configurada."""
+def create_access_token(user_id: int, email: str, roles: list | None = None) -> str:
+    """Crea un token JWT con expiracion configurada. Incluye roles si se proporcionan."""
     now = datetime.now(timezone.utc)
     expire = now + timedelta(hours=JWT_EXPIRATION_HOURS)
     payload = {
@@ -44,6 +44,12 @@ def create_access_token(user_id: int, email: str) -> str:
         "exp": expire,
         "iat": now,
     }
+    if roles:
+        # include both roles array and a primary 'rol' if single
+        payload["roles"] = roles
+        if len(roles) == 1:
+            payload["rol"] = roles[0]
+
     encoded_jwt = jwt.encode(payload, JWT_SECRET_KEY, algorithm=JWT_ALGORITHM)
     return encoded_jwt
 
