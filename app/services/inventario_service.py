@@ -8,6 +8,7 @@ from app.repositories.inventario_repository import InventarioRepository
 from app.repositories.producto_repository import ProductoRepository
 from app.repositories.sucursal_repository import SucursalRepository
 from app.schemas.inventario_schema import (
+    ActualizarStockSucursalRequest,
     MovimientoInventarioCreate,
     MovimientoInventarioResponse,
     StockProductoResponse,
@@ -48,6 +49,7 @@ class InventarioService:
     @staticmethod
     def _serializar_movimiento(movimiento, stock_actual: int) -> dict:
         return {
+            "id_movimiento": movimiento.id_movimiento_inventario,
             "id_movimiento_inventario": movimiento.id_movimiento_inventario,
             "id_producto": movimiento.id_producto,
             "id_tipo_movimiento": movimiento.id_tipo_movimiento,
@@ -57,6 +59,7 @@ class InventarioService:
             "observacion": movimiento.observacion,
             "fecha_movimiento": movimiento.fecha_movimiento,
             "stock_actual": stock_actual,
+            "producto": movimiento.producto,
             "tipo_movimiento": movimiento.tipo_movimiento,
         }
 
@@ -104,6 +107,102 @@ class InventarioService:
             for stock in stocks
             if stock.producto is not None and stock.producto.id_empresa == id_empresa
         ]
+
+    @staticmethod
+    def listar_movimientos_por_sucursal(
+        db: Session,
+        current_user: Usuario,
+        id_empresa: int,
+        id_sucursal: int,
+    ) -> list[MovimientoInventarioResponse]:
+        InventarioService._validar_empresa_y_sucursal_del_usuario(
+            db=db,
+            current_user=current_user,
+            id_empresa=id_empresa,
+            id_sucursal=id_sucursal,
+        )
+        movimientos = InventarioRepository.obtener_movimientos_por_sucursal(
+            db=db,
+            id_sucursal=id_sucursal,
+        )
+        return [
+            MovimientoInventarioResponse.model_validate(
+                InventarioService._serializar_movimiento(
+                    movimiento=movimiento,
+                    stock_actual=0,
+                )
+            )
+            for movimiento in movimientos
+            if movimiento.producto is not None and movimiento.producto.id_empresa == id_empresa
+        ]
+
+    @staticmethod
+    def actualizar_stock_sucursal(
+        db: Session,
+        current_user: Usuario,
+        id_empresa: int,
+        id_sucursal: int,
+        id_producto: int,
+        payload: ActualizarStockSucursalRequest,
+    ) -> StockProductoResponse:
+        InventarioService._validar_empresa_y_sucursal_del_usuario(
+            db=db,
+            current_user=current_user,
+            id_empresa=id_empresa,
+            id_sucursal=id_sucursal,
+        )
+
+        if payload.stock_minimo is None and payload.stock_maximo is None:
+            raise ValueError("Debe enviar stock_minimo o stock_maximo para actualizar.")
+        if payload.stock_minimo is not None and payload.stock_minimo < 0:
+            raise ValueError("El stock minimo no puede ser negativo.")
+        if payload.stock_maximo is not None and payload.stock_maximo < 0:
+            raise ValueError("El stock maximo no puede ser negativo.")
+
+        stock = InventarioRepository.obtener_stock_por_producto_y_sucursal_con_producto(
+            db=db,
+            id_producto=id_producto,
+            id_sucursal=id_sucursal,
+        )
+        if stock is None:
+            raise LookupError("Stock no encontrado para el producto y sucursal indicados.")
+        if stock.producto is None or stock.producto.id_empresa != id_empresa:
+            raise ValueError("El producto no pertenece a la empresa indicada.")
+
+        nuevo_stock_minimo = payload.stock_minimo if payload.stock_minimo is not None else stock.stock_minimo
+        nuevo_stock_maximo = payload.stock_maximo if payload.stock_maximo is not None else stock.stock_maximo
+
+        if (
+            nuevo_stock_minimo is not None
+            and nuevo_stock_maximo is not None
+            and nuevo_stock_minimo > nuevo_stock_maximo
+        ):
+            raise ValueError("El stock minimo no puede ser mayor al stock maximo.")
+
+        try:
+            stock = InventarioRepository.actualizar_stock(
+                stock=stock,
+                datos={
+                    "stock_minimo": nuevo_stock_minimo,
+                    "stock_maximo": nuevo_stock_maximo,
+                    "fecha_actualizacion": datetime.now(),
+                },
+                db=db,
+            )
+            db.commit()
+            stock = InventarioRepository.obtener_stock_por_producto_y_sucursal_con_producto(
+                db=db,
+                id_producto=id_producto,
+                id_sucursal=id_sucursal,
+            )
+            if stock is None:
+                raise LookupError("No se pudo recuperar el stock actualizado.")
+            return StockProductoResponse.model_validate(
+                InventarioService._serializar_stock(stock)
+            )
+        except Exception:
+            db.rollback()
+            raise
 
     @staticmethod
     def crear_movimiento(
