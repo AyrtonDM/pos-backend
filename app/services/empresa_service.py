@@ -90,6 +90,27 @@ class EmpresaService:
         )
 
     @staticmethod
+    def obtener_empresas_del_usuario_como_empleado(
+        db: Session,
+        current_user: Usuario,
+    ):
+        if current_user is None or not current_user.activo:
+            raise ValueError("Usuario no autorizado o inactivo.")
+
+        rol_empleado = EmpresaRepository.obtener_rol_por_nombre(
+            db=db,
+            nombre="EMPLEADO",
+        )
+        if rol_empleado is None:
+            raise ValueError("No existe el rol EMPLEADO.")
+
+        return EmpresaRepository.obtener_empresas_por_usuario_y_rol(
+            db=db,
+            id_usuario=current_user.id_usuario,
+            id_rol=rol_empleado.id_rol,
+        )
+
+    @staticmethod
     def obtener_empresa_del_usuario(
         db: Session,
         current_user: Usuario,

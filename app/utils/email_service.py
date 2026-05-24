@@ -170,3 +170,57 @@ def send_employee_invitation_email(
     except Exception as e:
         print(f"Error sending employee invitation email: {e}")
         return False
+
+
+def send_client_invitation_email(
+    email: str,
+    nombre: str,
+    empresa_nombre: str,
+    invitation_link: str,
+) -> bool:
+    """
+    Envia un email con el link de invitacion para ser cliente de una empresa.
+    """
+    try:
+        subject = f"Invitacion para ser cliente de {empresa_nombre} - POS System"
+
+        html_content = f"""
+        <html>
+            <body style="font-family: Arial, sans-serif; background-color: #f4f4f4; padding: 20px;">
+                <div style="background-color: white; padding: 20px; border-radius: 8px; max-width: 600px; margin: 0 auto; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);">
+                    <h2 style="color: #333; margin-top: 0;">Hola, {nombre}</h2>
+                    <p style="color: #666; line-height: 1.6;">Recibiste una invitacion para convertirte en cliente de <strong>{empresa_nombre}</strong>.</p>
+                    <p style="color: #666; line-height: 1.6;">Para aceptar la invitacion y confirmar tu relacion con la empresa, haz clic en el siguiente boton:</p>
+                    <p style="margin: 28px 0; text-align: center;">
+                        <a href="{invitation_link}" style="background-color: #007bff; color: white; padding: 12px 18px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: bold;">
+                            Aceptar invitacion
+                        </a>
+                    </p>
+                    <p style="color: #666; font-size: 12px; margin-bottom: 6px;">Si el boton no funciona, copia y pega este link en tu navegador:</p>
+                    <p style="color: #007bff; font-size: 12px; word-break: break-all;">{invitation_link}</p>
+                </div>
+            </body>
+        </html>
+        """
+
+        message = MIMEMultipart("alternative")
+        message["Subject"] = subject
+        message["From"] = MAIL_FROM
+        message["To"] = email
+
+        text_content = (
+            f"Recibiste una invitacion para convertirte en cliente de {empresa_nombre}.\n"
+            f"Acepta la invitacion aqui: {invitation_link}"
+        )
+        message.attach(MIMEText(text_content, "plain"))
+        message.attach(MIMEText(html_content, "html"))
+
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
+            server.starttls()
+            server.login(SMTP_USER, SMTP_PASSWORD)
+            server.send_message(message)
+
+        return True
+    except Exception as e:
+        print(f"Error sending client invitation email: {e}")
+        return False

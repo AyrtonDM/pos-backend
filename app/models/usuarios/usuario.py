@@ -24,3 +24,7 @@ class Usuario(Base):
         "UsuarioRol", back_populates="usuario", cascade="all, delete-orphan"
     )
     movimientos_inventario = relationship("MovimientoInventario", back_populates="usuario")
+    movimientos_caja = relationship("MovimientoCaja", back_populates="usuario")
+    caja_sesiones = relationship("CajaSesion", back_populates="usuario")
+    clientes = relationship("Cliente", back_populates="usuario", cascade="all, delete-orphan")
+    ventas = relationship("Venta", back_populates="usuario")

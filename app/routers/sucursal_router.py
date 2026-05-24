@@ -1,182 +1,43 @@
 # -*- coding: utf-8 -*-
 from fastapi import APIRouter, Depends, HTTPException
+import logging
 from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 
 from app.core.database import SessionLocal
 from app.core.security import get_current_user
 from app.models.usuarios import Usuario
+from app.schemas.caja_schema import (
+    CajaCierreDetalleCreate,
+    CajaSesionCierreResponse,
+    CajaCreate,
+    CajaResponse,
+    CajaSesionCreate,
+    CajaSesionResponse,
+    CajaUpdate,
+    ResumenMovimientosCajaResponse,
+)
+from app.schemas.movimiento_caja_schema import (
+    MovimientoCajaCreate,
+    MovimientoCajaResponse,
+)
 from app.schemas.sucursal_schema import (
+    ClienteEmpresaResponse,
     EmpleadoSucursalResponse,
+    InvitacionClienteCreate,
     InvitacionEmpleadoCreate,
     SucursalEmpleadoAsignadaResponse,
     SucursalCreate,
     SucursalResponse,
     SucursalUpdate,
 )
+from app.services.caja_service import CajaService, CajaSesionAbiertaError
 from app.services.sucursal_service import SucursalService
 
 empresa_router = APIRouter(prefix="/api/empresas", tags=["sucursales"])
 sucursal_router = APIRouter(prefix="/api/sucursales", tags=["sucursales"])
+caja_router = APIRouter(prefix="/api/cajas", tags=["cajas"])
 invitacion_router = APIRouter(prefix="/api/invitaciones", tags=["invitaciones"])
-
-
-def _render_invitacion_aceptada_html(
-    nombre_empresa: str,
-    nombre_sucursal: str,
-    ya_aceptada: bool = False,
-) -> str:
-    titulo = "Invitacion aceptada" if not ya_aceptada else "Invitacion ya aceptada"
-    subtitulo = (
-        "Ahora eres trabajador de la empresa"
-        if not ya_aceptada
-        else "Ya formas parte de la empresa"
-    )
-    mensaje_detalle = (
-        "Tu acceso como trabajador ya quedo habilitado. Cuando quieras continuar, "
-        "puedes volver a la aplicacion e ingresar con tu cuenta."
-        if not ya_aceptada
-        else "Este enlace ya habia sido utilizado antes, pero tu acceso sigue activo "
-        "para esta empresa y sucursal."
-    )
-
-    return f"""<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>{titulo}</title>
-    <style>
-        :root {{
-            --color-bg: #c7dd72;
-            --color-bg-soft: #d8e89a;
-            --color-surface: #ffffff;
-            --color-primary: #f4a62a;
-            --color-primary-hover: #de931d;
-            --color-text: #2d2d2d;
-            --color-text-soft: #6b7280;
-            --color-border: #e5e7eb;
-            --color-success: #22c55e;
-        }}
-
-        * {{
-            box-sizing: border-box;
-        }}
-
-        body {{
-            margin: 0;
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 24px;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            color: var(--color-text);
-            background:
-                radial-gradient(circle at top left, rgba(255,255,255,0.55), transparent 35%),
-                linear-gradient(135deg, var(--color-bg-soft), var(--color-bg));
-        }}
-
-        .card {{
-            width: 100%;
-            max-width: 720px;
-            background: var(--color-surface);
-            border: 1px solid rgba(255,255,255,0.55);
-            border-radius: 28px;
-            padding: 40px 36px;
-            box-shadow: 0 24px 60px rgba(45, 45, 45, 0.16);
-            position: relative;
-            overflow: hidden;
-        }}
-
-        .card::before {{
-            content: "";
-            position: absolute;
-            inset: 0 0 auto auto;
-            width: 180px;
-            height: 180px;
-            background: radial-gradient(circle, rgba(244,166,42,0.28), transparent 70%);
-            transform: translate(30%, -30%);
-        }}
-
-        .badge {{
-            display: inline-flex;
-            align-items: center;
-            gap: 10px;
-            padding: 10px 16px;
-            border-radius: 999px;
-            background: rgba(34, 197, 94, 0.12);
-            color: #15803d;
-            font-weight: 700;
-            letter-spacing: 0.02em;
-        }}
-
-        .badge-dot {{
-            width: 10px;
-            height: 10px;
-            border-radius: 50%;
-            background: var(--color-success);
-        }}
-
-        h1 {{
-            margin: 22px 0 14px;
-            font-size: clamp(2rem, 4vw, 3.2rem);
-            line-height: 1.02;
-        }}
-
-        p {{
-            margin: 0;
-            font-size: 1.05rem;
-            line-height: 1.7;
-            color: var(--color-text-soft);
-        }}
-
-        .highlight {{
-            margin-top: 28px;
-            padding: 22px;
-            border-radius: 22px;
-            background: linear-gradient(135deg, rgba(244,166,42,0.15), rgba(199,221,114,0.26));
-            border: 1px solid var(--color-border);
-        }}
-
-        .highlight strong {{
-            color: var(--color-text);
-        }}
-
-        .footer {{
-            margin-top: 24px;
-            font-size: 0.95rem;
-            color: var(--color-text-soft);
-        }}
-
-        @media (max-width: 640px) {{
-            .card {{
-                padding: 28px 22px;
-                border-radius: 22px;
-            }}
-        }}
-    </style>
-</head>
-<body>
-    <main class="card">
-        <div class="badge">
-            <span class="badge-dot"></span>
-            {titulo}
-        </div>
-        <h1>{titulo}</h1>
-        <p>
-            {subtitulo} <strong>{nombre_empresa}</strong> en la sucursal
-            <strong>{nombre_sucursal}</strong>.
-        </p>
-        <section class="highlight">
-            <p>
-                {mensaje_detalle}
-            </p>
-        </section>
-        <p class="footer">Gracias por unirte al equipo.</p>
-    </main>
-</body>
-</html>"""
 
 
 def get_db():
@@ -185,6 +46,38 @@ def get_db():
         yield db
     finally:
         db.close()
+
+
+def _render_client_invitation_html(
+    mensaje: str,
+    empresa_nombre: str,
+    es_error: bool = False,
+) -> str:
+    color_principal = "#d9534f" if es_error else "#007bff"
+    titulo = "Invitacion de cliente" if not es_error else "No se pudo completar la invitacion"
+    badge = "?" if es_error else "?"
+    empresa_bloque = (
+        f'<p style="color: #666; font-size: 14px; line-height: 1.7; margin: 0 0 24px 0;">Empresa: <strong>{empresa_nombre}</strong></p>'
+        if empresa_nombre
+        else ""
+    )
+    return f"""
+    <html>
+        <body style="font-family: Arial, sans-serif; background-color: #f4f4f4; padding: 20px; margin: 0;">
+            <div style="background-color: white; padding: 24px; border-radius: 8px; max-width: 640px; margin: 0 auto; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);">
+                <div style="width: 56px; height: 56px; border-radius: 50%; background-color: {color_principal}; color: white; display: flex; align-items: center; justify-content: center; font-size: 28px; margin-bottom: 18px;">
+                    {badge}
+                </div>
+                <h2 style="color: #333; margin: 0 0 12px 0;">{titulo}</h2>
+                <p style="color: #666; font-size: 16px; line-height: 1.7; margin: 0 0 12px 0;">{mensaje}</p>
+                {empresa_bloque}
+                <div style="padding-top: 12px; border-top: 1px solid #eee; color: #999; font-size: 12px; line-height: 1.6;">
+                    Esta confirmacion fue generada automaticamente al abrir el enlace de invitacion.
+                </div>
+            </div>
+        </body>
+    </html>
+    """
 
 
 @empresa_router.post("/{id_empresa}/sucursales", response_model=SucursalResponse)
@@ -281,6 +174,28 @@ def invitar_empleado(
         raise HTTPException(status_code=500, detail="Error al enviar la invitacion.")
 
 
+@empresa_router.post("/{id_empresa}/invitar-cliente")
+def invitar_cliente(
+    id_empresa: int,
+    datos: InvitacionClienteCreate,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    try:
+        return SucursalService.enviar_invitacion_cliente(
+            db=db,
+            current_user=current_user,
+            id_empresa=id_empresa,
+            email=datos.email,
+        )
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception:
+        raise HTTPException(status_code=500, detail="Error al enviar la invitacion.")
+
+
 @empresa_router.get(
     "/{id_empresa}/sucursales/{id_sucursal}/empleados",
     response_model=list[EmpleadoSucursalResponse],
@@ -304,6 +219,269 @@ def obtener_empleados_sucursal(
         raise HTTPException(status_code=400, detail=str(e))
     except Exception:
         raise HTTPException(status_code=500, detail="Error al obtener los empleados.")
+
+
+@empresa_router.get(
+    "/{id_empresa}/clientes",
+    response_model=list[ClienteEmpresaResponse],
+)
+def obtener_clientes_empresa(
+    id_empresa: int,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    try:
+        return SucursalService.obtener_clientes_de_empresa(
+            db=db,
+            current_user=current_user,
+            id_empresa=id_empresa,
+        )
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception:
+        raise HTTPException(status_code=500, detail="Error al obtener los clientes.")
+
+
+@sucursal_router.post("/{id_sucursal}/cajas", response_model=CajaResponse)
+def crear_caja(
+    id_sucursal: int,
+    datos: CajaCreate,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    try:
+        return CajaService.crear_caja(
+            db=db,
+            current_user=current_user,
+            id_sucursal=id_sucursal,
+            nombre=datos.nombre,
+            codigo=datos.codigo,
+        )
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception:
+        raise HTTPException(status_code=500, detail="Error al crear la caja.")
+
+
+@caja_router.post(
+    "/{id_caja}/sesiones",
+    response_model=CajaSesionResponse,
+)
+def crear_caja_sesion(
+    id_caja: int,
+    datos: CajaSesionCreate,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    try:
+        return CajaService.crear_caja_sesion(
+            db=db,
+            current_user=current_user,
+            id_caja=id_caja,
+            monto_inicial=datos.monto_inicial,
+            nota=datos.nota,
+        )
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except CajaSesionAbiertaError as e:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "id_caja": e.id_caja,
+                "id_caja_sesion": e.id_caja_sesion,
+                "detail": e.message,
+            },
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception:
+        raise HTTPException(status_code=500, detail="Error al crear la sesion de caja.")
+
+
+@caja_router.post(
+    "/sesiones/{id_caja_sesion}/movimientos",
+    response_model=MovimientoCajaResponse,
+)
+def crear_movimiento_caja(
+    id_caja_sesion: int,
+    datos: MovimientoCajaCreate,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    try:
+        return CajaService.crear_movimiento_caja(
+            db=db,
+            current_user=current_user,
+            id_caja_sesion=id_caja_sesion,
+            concepto=datos.concepto,
+            monto=datos.monto,
+            id_tipo_movimiento_caja=datos.id_tipo_movimiento_caja,
+            id_metodo_pago=datos.id_metodo_pago,
+        )
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception:
+        raise HTTPException(status_code=500, detail="Error al crear el movimiento de caja.")
+
+
+@caja_router.get(
+    "/sesiones/{id_caja_sesion}/movimientos",
+    response_model=list[MovimientoCajaResponse],
+)
+def listar_movimientos_caja_sesion(
+    id_caja_sesion: int,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    try:
+        return CajaService.listar_movimientos_de_caja_sesion(
+            db=db,
+            current_user=current_user,
+            id_caja_sesion=id_caja_sesion,
+        )
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception:
+        raise HTTPException(status_code=500, detail="Error al listar los movimientos de caja.")
+
+
+@caja_router.get(
+    "/sesiones/{id_caja_sesion}/movimientos/resumen",
+    response_model=ResumenMovimientosCajaResponse,
+)
+def resumen_movimientos_caja_sesion(
+    id_caja_sesion: int,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    try:
+        return CajaService.resumen_movimientos_por_metodo_pago(
+            db=db,
+            current_user=current_user,
+            id_caja_sesion=id_caja_sesion,
+        )
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception:
+        raise HTTPException(status_code=500, detail="Error al obtener el resumen de movimientos de caja.")
+
+
+@caja_router.post(
+    "/sesiones/{id_caja_sesion}/cierres",
+    response_model=CajaSesionCierreResponse,
+)
+def cerrar_caja_sesion(
+    id_caja_sesion: int,
+    datos: list[CajaCierreDetalleCreate],
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    try:
+        return CajaService.cerrar_caja_sesion_con_detalles(
+            db=db,
+            current_user=current_user,
+            id_caja_sesion=id_caja_sesion,
+            cierres=[dato.model_dump() for dato in datos],
+        )
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception:
+        raise HTTPException(status_code=500, detail="Error al cerrar la sesion de caja.")
+
+
+@empresa_router.get(
+    "/{id_empresa}/sucursales/{id_sucursal}/cajas",
+    response_model=list[CajaResponse],
+)
+def listar_cajas_sucursal(
+    id_empresa: int,
+    id_sucursal: int,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    try:
+        return CajaService.listar_cajas_de_sucursal(
+            db=db,
+            current_user=current_user,
+            id_empresa=id_empresa,
+            id_sucursal=id_sucursal,
+        )
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception:
+        raise HTTPException(status_code=500, detail="Error al listar las cajas.")
+
+
+@empresa_router.get(
+    "/{id_empresa}/sucursales/{id_sucursal}/cajas/{id_caja}",
+    response_model=CajaResponse,
+)
+def obtener_caja_sucursal(
+    id_empresa: int,
+    id_sucursal: int,
+    id_caja: int,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    try:
+        return CajaService.obtener_caja(
+            db=db,
+            current_user=current_user,
+            id_empresa=id_empresa,
+            id_sucursal=id_sucursal,
+            id_caja=id_caja,
+        )
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception:
+        raise HTTPException(status_code=500, detail="Error al obtener la caja.")
+
+
+@empresa_router.put(
+    "/{id_empresa}/sucursales/{id_sucursal}/cajas/{id_caja}",
+    response_model=CajaResponse,
+)
+def actualizar_caja_sucursal(
+    id_empresa: int,
+    id_sucursal: int,
+    id_caja: int,
+    datos: CajaUpdate,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    try:
+        return CajaService.actualizar_caja(
+            db=db,
+            current_user=current_user,
+            id_empresa=id_empresa,
+            id_sucursal=id_sucursal,
+            id_caja=id_caja,
+            nombre=datos.nombre,
+            codigo=datos.codigo,
+            activo=datos.activo,
+        )
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception:
+        raise HTTPException(status_code=500, detail="Error al actualizar la caja.")
 
 
 @sucursal_router.put("/{id_sucursal}", response_model=SucursalResponse)
@@ -333,10 +511,11 @@ def actualizar_sucursal(
 
 
 @sucursal_router.get(
-    "/mis-sucursales-empleado",
+    "/mis-sucursales-empleado/{id_empresa}",
     response_model=list[SucursalEmpleadoAsignadaResponse],
 )
 def obtener_mis_sucursales_empleado(
+    id_empresa: int,
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(get_current_user),
 ):
@@ -344,17 +523,17 @@ def obtener_mis_sucursales_empleado(
         return SucursalService.obtener_sucursales_asignadas_como_empleado(
             db=db,
             current_user=current_user,
+            id_empresa=id_empresa,
         )
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception:
         raise HTTPException(status_code=500, detail="Error al obtener las sucursales.")
 
 
-@invitacion_router.get(
-    "/empleado/aceptar/{id_empresa}/{id_sucursal}/{id_usuario}",
-    response_class=HTMLResponse,
-)
+@invitacion_router.get("/empleado/aceptar/{id_empresa}/{id_sucursal}/{id_usuario}")
 def aceptar_invitacion_empleado(
     id_empresa: int,
     id_sucursal: int,
@@ -362,18 +541,11 @@ def aceptar_invitacion_empleado(
     db: Session = Depends(get_db),
 ):
     try:
-        resultado = SucursalService.aceptar_invitacion_empleado(
+        return SucursalService.aceptar_invitacion_empleado(
             db=db,
             id_empresa=id_empresa,
             id_sucursal=id_sucursal,
             id_usuario=id_usuario,
-        )
-        return HTMLResponse(
-            content=_render_invitacion_aceptada_html(
-                nombre_empresa=resultado.get("empresa", ""),
-                nombre_sucursal=resultado.get("sucursal", ""),
-                ya_aceptada=resultado.get("ya_aceptada", False),
-            )
         )
     except LookupError as e:
         raise HTTPException(status_code=404, detail=str(e))
@@ -381,3 +553,43 @@ def aceptar_invitacion_empleado(
         raise HTTPException(status_code=400, detail=str(e))
     except Exception:
         raise HTTPException(status_code=500, detail="Error al aceptar la invitacion.")
+
+
+@invitacion_router.get("/cliente/aceptar/{id_empresa}/{id_usuario}")
+def aceptar_invitacion_cliente(
+    id_empresa: int,
+    id_usuario: int,
+    db: Session = Depends(get_db),
+):
+    try:
+        resultado = SucursalService.aceptar_invitacion_cliente(
+            db=db,
+            id_empresa=id_empresa,
+            id_usuario=id_usuario,
+        )
+        html = _render_client_invitation_html(
+            mensaje=resultado["mensaje"],
+            empresa_nombre=resultado["empresa_nombre"],
+        )
+        return HTMLResponse(content=html, status_code=200)
+    except LookupError as e:
+        html = _render_client_invitation_html(
+            mensaje=str(e),
+            empresa_nombre="",
+            es_error=True,
+        )
+        return HTMLResponse(content=html, status_code=404)
+    except ValueError as e:
+        html = _render_client_invitation_html(
+            mensaje=str(e),
+            empresa_nombre="",
+            es_error=True,
+        )
+        return HTMLResponse(content=html, status_code=400)
+    except Exception:
+        html = _render_client_invitation_html(
+            mensaje="Error al aceptar la invitacion.",
+            empresa_nombre="",
+            es_error=True,
+        )
+        return HTMLResponse(content=html, status_code=500)

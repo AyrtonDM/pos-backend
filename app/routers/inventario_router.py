@@ -5,12 +5,13 @@ from app.core.database import SessionLocal
 from app.core.security import get_current_user
 from app.models.usuarios import Usuario
 from app.schemas.inventario_schema import (
-    ActualizarStockSucursalRequest,
     MovimientoInventarioCreate,
     MovimientoInventarioResponse,
     StockProductoResponse,
+    StockUpdateRequest,
     TipoMovimientoResponse,
 )
+from app.schemas.inventario_schema import MovimientoListResponse
 from app.services.inventario_service import InventarioService
 
 router = APIRouter(prefix="/api/inventario", tags=["inventario"])
@@ -60,31 +61,6 @@ def crear_movimiento(
 
 
 @router.get(
-    "/empresas/{id_empresa}/sucursales/{id_sucursal}/movimientos",
-    response_model=list[MovimientoInventarioResponse],
-)
-def listar_movimientos_sucursal(
-    id_empresa: int,
-    id_sucursal: int,
-    db: Session = Depends(get_db),
-    current_user: Usuario = Depends(get_current_user),
-):
-    try:
-        return InventarioService.listar_movimientos_por_sucursal(
-            db=db,
-            current_user=current_user,
-            id_empresa=id_empresa,
-            id_sucursal=id_sucursal,
-        )
-    except LookupError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception:
-        raise HTTPException(status_code=500, detail="Error al listar los movimientos.")
-
-
-@router.get(
     "/empresas/{id_empresa}/sucursales/{id_sucursal}/stock",
     response_model=list[StockProductoResponse],
 )
@@ -109,20 +85,49 @@ def listar_stock_sucursal(
         raise HTTPException(status_code=500, detail="Error al listar el stock.")
 
 
-@router.put(
-    "/empresas/{id_empresa}/sucursales/{id_sucursal}/stock/{id_producto}",
-    response_model=StockProductoResponse,
+@router.get(
+    "/empresas/{id_empresa}/sucursales/{id_sucursal}/movimientos",
+    response_model=list[MovimientoListResponse],
 )
-def actualizar_stock_sucursal(
+def listar_movimientos_sucursal(
     id_empresa: int,
     id_sucursal: int,
-    id_producto: int,
-    datos: ActualizarStockSucursalRequest,
+    skip: int = 0,
+    limit: int = 10,
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(get_current_user),
 ):
     try:
-        return InventarioService.actualizar_stock_sucursal(
+        return InventarioService.listar_movimientos_por_sucursal(
+            db=db,
+            current_user=current_user,
+            id_empresa=id_empresa,
+            id_sucursal=id_sucursal,
+            skip=skip,
+            limit=limit,
+        )
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception:
+        raise HTTPException(status_code=500, detail="Error al listar movimientos de inventario.")
+
+
+@router.put(
+    "/empresas/{id_empresa}/sucursales/{id_sucursal}/stock/{id_producto}",
+    response_model=StockProductoResponse,
+)
+def actualizar_stock_producto(
+    id_empresa: int,
+    id_sucursal: int,
+    id_producto: int,
+    datos: StockUpdateRequest,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    try:
+        return InventarioService.actualizar_stock_producto(
             db=db,
             current_user=current_user,
             id_empresa=id_empresa,
@@ -135,7 +140,4 @@ def actualizar_stock_sucursal(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception:
-        raise HTTPException(
-            status_code=500,
-            detail="Error al actualizar stock minimo y maximo.",
-        )
+        raise HTTPException(status_code=500, detail="Error al actualizar el stock.")

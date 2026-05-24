@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, Field
 
 
 class TipoMovimientoResponse(BaseModel):
@@ -9,14 +9,8 @@ class TipoMovimientoResponse(BaseModel):
     descripcion: str | None
     direccion: str
 
-    model_config = ConfigDict(from_attributes=True)
-
-
-class ProductoMovimientoResponse(BaseModel):
-    id_producto: int
-    nombre: str
-
-    model_config = ConfigDict(from_attributes=True)
+    class Config:
+        from_attributes = True
 
 
 class MovimientoInventarioCreate(BaseModel):
@@ -26,13 +20,7 @@ class MovimientoInventarioCreate(BaseModel):
     observacion: str | None = None
 
 
-class ActualizarStockSucursalRequest(BaseModel):
-    stock_minimo: int | None = None
-    stock_maximo: int | None = None
-
-
 class MovimientoInventarioResponse(BaseModel):
-    id_movimiento: int = Field(validation_alias="id_movimiento_inventario")
     id_movimiento_inventario: int
     id_producto: int
     id_tipo_movimiento: int
@@ -42,10 +30,10 @@ class MovimientoInventarioResponse(BaseModel):
     observacion: str | None
     fecha_movimiento: datetime
     stock_actual: int
-    producto: ProductoMovimientoResponse | None = None
     tipo_movimiento: TipoMovimientoResponse | None
 
-    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+    class Config:
+        from_attributes = True
 
 
 class StockProductoResponse(BaseModel):
@@ -62,4 +50,36 @@ class StockProductoResponse(BaseModel):
     imagen: str | None
     activo: bool
 
-    model_config = ConfigDict(from_attributes=True)
+    class Config:
+        from_attributes = True
+
+
+class StockUpdateRequest(BaseModel):
+    stock_minimo: int
+    stock_maximo: int
+
+    class Config:
+        from_attributes = True
+
+
+class MovimientoProductoSimple(BaseModel):
+    id_producto: int
+    nombre: str
+
+
+class TipoMovimientoSimple(BaseModel):
+    id_tipo_movimiento: int
+    nombre: str
+
+
+class MovimientoListResponse(BaseModel):
+    id_movimiento: int
+    id_producto: int
+    cantidad: int
+    observacion: str | None
+    tipo: str
+    producto: MovimientoProductoSimple
+    tipo_movimiento: TipoMovimientoSimple
+
+    class Config:
+        from_attributes = True

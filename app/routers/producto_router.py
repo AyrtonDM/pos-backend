@@ -41,6 +41,23 @@ def listar_categorias(db: Session = Depends(get_db), current_user: Usuario = Dep
         raise HTTPException(status_code=500, detail="Error al listar las categorias.")
 
 
+@router.post("/categorias", response_model=CategoriaProductoResponse)
+def crear_categoria(datos: CategoriaProductoCreate, db: Session = Depends(get_db), current_user: Usuario = Depends(get_current_user)):
+    try:
+        return ProductoService.crear_categoria(
+            db=db,
+            nombre=datos.nombre,
+            descripcion=datos.descripcion,
+            activo=datos.activo,
+        )
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception:
+        raise HTTPException(status_code=500, detail="Error al crear la categoria.")
+
+
 @router.get("/categorias/{id_categoria_producto}", response_model=CategoriaProductoResponse)
 def obtener_categoria(id_categoria_producto: int, db: Session = Depends(get_db), current_user: Usuario = Depends(get_current_user)):
     try:

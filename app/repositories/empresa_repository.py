@@ -43,6 +43,10 @@ class EmpresaRepository:
         return db.query(Rol).filter(Rol.nombre == nombre).first()
 
     @staticmethod
+    def obtener_empresa_por_id(db: Session, id_empresa: int) -> Empresa | None:
+        return db.query(Empresa).filter(Empresa.id_empresa == id_empresa).first()
+
+    @staticmethod
     def obtener_usuario_rol_sin_sucursal(
         db: Session,
         id_usuario: int,
@@ -96,6 +100,25 @@ class EmpresaRepository:
         )
 
     @staticmethod
+    def obtener_usuario_rol_por_empresa_y_rol_sin_sucursal(
+        db: Session,
+        id_usuario: int,
+        id_empresa: int,
+        id_rol: int,
+    ) -> UsuarioRol | None:
+        return (
+            db.query(UsuarioRol)
+            .filter(
+                UsuarioRol.id_usuario == id_usuario,
+                UsuarioRol.id_empresa == id_empresa,
+                UsuarioRol.id_rol == id_rol,
+                UsuarioRol.id_sucursal.is_(None),
+                UsuarioRol.activo.is_(True),
+            )
+            .first()
+        )
+
+    @staticmethod
     def obtener_usuarios_rol_por_sucursal_y_rol(
         db: Session,
         id_empresa: int,
@@ -115,12 +138,31 @@ class EmpresaRepository:
         )
 
     @staticmethod
+    def obtener_usuarios_rol_por_empresa_y_rol_sin_sucursal(
+        db: Session,
+        id_empresa: int,
+        id_rol: int,
+    ) -> list[UsuarioRol]:
+        return (
+            db.query(UsuarioRol)
+            .options(joinedload(UsuarioRol.usuario).joinedload(Usuario.persona))
+            .filter(
+                UsuarioRol.id_empresa == id_empresa,
+                UsuarioRol.id_rol == id_rol,
+                UsuarioRol.id_sucursal.is_(None),
+                UsuarioRol.activo.is_(True),
+            )
+            .all()
+        )
+
+    @staticmethod
     def obtener_sucursales_empleado_por_usuario(
         db: Session,
         id_usuario: int,
         id_rol: int,
+        id_empresa: int | None = None,
     ) -> list[UsuarioRol]:
-        return (
+        query = (
             db.query(UsuarioRol)
             .options(
                 joinedload(UsuarioRol.empresa),
@@ -132,8 +174,12 @@ class EmpresaRepository:
                 UsuarioRol.id_sucursal.is_not(None),
                 UsuarioRol.activo.is_(True),
             )
-            .all()
         )
+
+        if id_empresa is not None:
+            query = query.filter(UsuarioRol.id_empresa == id_empresa)
+
+        return query.all()
 
     @staticmethod
     def asignar_sucursal_a_usuario_rol(
@@ -155,6 +201,24 @@ class EmpresaRepository:
                 UsuarioRol.id_usuario == id_usuario,
                 UsuarioRol.activo.is_(True),
             )
+            .all()
+        )
+
+    @staticmethod
+    def obtener_empresas_por_usuario_y_rol(
+        db: Session,
+        id_usuario: int,
+        id_rol: int,
+    ) -> list[Empresa]:
+        return (
+            db.query(Empresa)
+            .join(UsuarioRol, UsuarioRol.id_empresa == Empresa.id_empresa)
+            .filter(
+                UsuarioRol.id_usuario == id_usuario,
+                UsuarioRol.id_rol == id_rol,
+                UsuarioRol.activo.is_(True),
+            )
+            .distinct()
             .all()
         )
 

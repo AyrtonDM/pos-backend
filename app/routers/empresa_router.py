@@ -12,7 +12,14 @@ from app.schemas.producto_schema import (
     ProductoResponse,
     SubcategoriaProductoResponse,
 )
+from app.schemas.cliente_schema import (
+    CategoriaClienteResponse,
+    CategoriaClienteUpdate,
+    ClienteResponse,
+    ClienteUpdate,
+)
 from app.schemas.empresa_schema import EmpresaCreate, EmpresaResponse, EmpresaUpdate
+from app.services.cliente_service import ClienteService
 from app.services.empresa_service import EmpresaService
 from app.services.producto_service import ProductoService
 from app.utils.product_image_storage import save_product_image
@@ -44,6 +51,25 @@ def obtener_empresas_del_usuario(
         raise HTTPException(status_code=401, detail=str(e))
     except Exception:
         raise HTTPException(status_code=500, detail="Error al obtener las empresas.")
+
+
+@router.get("/mis-empresas-empleado", response_model=list[EmpresaResponse])
+def obtener_empresas_del_usuario_como_empleado(
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    try:
+        return EmpresaService.obtener_empresas_del_usuario_como_empleado(
+            db=db,
+            current_user=current_user,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception:
+        raise HTTPException(
+            status_code=500,
+            detail="Error al obtener las empresas del empleado.",
+        )
 
 
 @router.get("/{id_empresa}", response_model=EmpresaResponse)
@@ -137,6 +163,83 @@ def crear_categoria_empresa(
         raise HTTPException(status_code=400, detail=str(e))
     except Exception:
         raise HTTPException(status_code=500, detail="Error al crear la categoria.")
+
+
+@router.get("/{id_empresa}/categorias-cliente", response_model=list[CategoriaClienteResponse])
+def listar_categorias_cliente_empresa(
+    id_empresa: int,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    try:
+        return ClienteService.listar_categorias_cliente(
+            db=db,
+            current_user=current_user,
+            id_empresa=id_empresa,
+        )
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=401, detail=str(e))
+    except Exception:
+        raise HTTPException(status_code=500, detail="Error al listar las categorias de cliente.")
+
+
+@router.put("/{id_empresa}/categorias-cliente/{id_categoria_cliente}", response_model=CategoriaClienteResponse)
+def actualizar_categoria_cliente_empresa(
+    id_empresa: int,
+    id_categoria_cliente: int,
+    datos: CategoriaClienteUpdate,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    try:
+        return ClienteService.actualizar_categoria_cliente(
+            db=db,
+            current_user=current_user,
+            id_empresa=id_empresa,
+            id_categoria_cliente=id_categoria_cliente,
+            nombre=datos.nombre,
+            descripcion=datos.descripcion,
+            permite_credito=datos.permite_credito,
+            descuento_base=datos.descuento_base,
+            limite_credito=datos.limite_credito,
+            activo=datos.activo,
+        )
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=401, detail=str(e))
+    except Exception:
+        raise HTTPException(status_code=500, detail="Error al actualizar la categoria de cliente.")
+
+
+@router.put("/{id_empresa}/clientes/{id_cliente}", response_model=ClienteResponse)
+def actualizar_cliente_empresa(
+    id_empresa: int,
+    id_cliente: int,
+    datos: ClienteUpdate,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    try:
+        return ClienteService.actualizar_cliente_de_empresa(
+            db=db,
+            current_user=current_user,
+            id_empresa=id_empresa,
+            id_cliente=id_cliente,
+            id_categoria_cliente=datos.id_categoria_cliente,
+            codigo_cliente=datos.codigo_cliente,
+            saldo_credito=datos.saldo_credito,
+            limite_credito=datos.limite_credito,
+            activo=datos.activo,
+        )
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception:
+        raise HTTPException(status_code=500, detail="Error al actualizar el cliente.")
 
 
 @router.get("/{id_empresa}/subcategorias", response_model=list[SubcategoriaProductoResponse])
