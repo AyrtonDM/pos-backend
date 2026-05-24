@@ -62,6 +62,9 @@ class StockUpdateRequest(BaseModel):
         from_attributes = True
 
 
+ActualizarStockSucursalRequest = StockUpdateRequest
+
+
 class MovimientoProductoSimple(BaseModel):
     id_producto: int
     nombre: str

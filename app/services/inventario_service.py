@@ -8,10 +8,10 @@ from app.repositories.inventario_repository import InventarioRepository
 from app.repositories.producto_repository import ProductoRepository
 from app.repositories.sucursal_repository import SucursalRepository
 from app.schemas.inventario_schema import (
-    ActualizarStockSucursalRequest,
     MovimientoInventarioCreate,
     MovimientoInventarioResponse,
     StockProductoResponse,
+    StockUpdateRequest,
     TipoMovimientoResponse,
 )
 
@@ -143,7 +143,7 @@ class InventarioService:
         id_empresa: int,
         id_sucursal: int,
         id_producto: int,
-        payload: ActualizarStockSucursalRequest,
+        payload: StockUpdateRequest,
     ) -> StockProductoResponse:
         InventarioService._validar_empresa_y_sucursal_del_usuario(
             db=db,
