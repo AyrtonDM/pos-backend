@@ -32,7 +32,10 @@ class VentaRepository:
     def obtener_venta_por_id(db: Session, id_venta: int) -> Venta | None:
         return (
             db.query(Venta)
-            .options(joinedload(Venta.detalles))
+            .options(
+                joinedload(Venta.detalles),
+                joinedload(Venta.pagos).joinedload(VentaPago.metodo_pago),
+            )
             .filter(Venta.id_venta == id_venta)
             .first()
         )
@@ -41,7 +44,10 @@ class VentaRepository:
     def obtener_ventas_por_caja_sesion(db: Session, id_caja_sesion: int) -> list[Venta]:
         return (
             db.query(Venta)
-            .options(joinedload(Venta.detalles), joinedload(Venta.pagos))
+            .options(
+                joinedload(Venta.detalles),
+                joinedload(Venta.pagos).joinedload(VentaPago.metodo_pago),
+            )
             .filter(Venta.id_caja_sesion == id_caja_sesion)
             .order_by(Venta.fecha.desc())
             .all()

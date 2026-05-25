@@ -1,4 +1,5 @@
 from pydantic import BaseModel
+from datetime import datetime
 from decimal import Decimal
 from typing import List
 
@@ -56,7 +57,10 @@ class VentaResponse(BaseModel):
     subtotal: Decimal
     descuento_total: Decimal | None
     total: Decimal
+    fecha: datetime
     estado: str
+    id_metodo_pago: int | None = None
+    metodo_pago: MetodoPagoResponse | None = None
     detalles: List[DetalleVentaResponse]
 
     class Config:

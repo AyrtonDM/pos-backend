@@ -60,7 +60,6 @@ class InventarioService:
             "observacion": movimiento.observacion,
             "fecha_movimiento": movimiento.fecha_movimiento,
             "stock_actual": stock_actual,
-            "producto": movimiento.producto,
             "tipo_movimiento": movimiento.tipo_movimiento,
         }
 

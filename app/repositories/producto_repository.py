@@ -25,6 +25,7 @@ class ProductoRepository:
     def obtener_categorias_por_empresa(db: Session, id_empresa: int) -> list[CategoriaProducto]:
         return (
             db.query(CategoriaProducto)
+            .options(joinedload(CategoriaProducto.subcategorias))
             .filter(CategoriaProducto.id_empresa == id_empresa)
             .order_by(CategoriaProducto.nombre.asc())
             .all()
@@ -100,6 +101,16 @@ class ProductoRepository:
         return (
             db.query(Producto)
             .options(joinedload(Producto.subcategoria).joinedload(SubcategoriaProducto.categoria_producto))
+            .order_by(Producto.nombre.asc())
+            .all()
+        )
+
+    @staticmethod
+    def obtener_productos_por_empresa(db: Session, id_empresa: int) -> list[Producto]:
+        return (
+            db.query(Producto)
+            .options(joinedload(Producto.subcategoria).joinedload(SubcategoriaProducto.categoria_producto))
+            .filter(Producto.id_empresa == id_empresa)
             .order_by(Producto.nombre.asc())
             .all()
         )

@@ -77,7 +77,7 @@ class CajaSesionCierreResponse(BaseModel):
     monto_final: Decimal
     estado: str
     fecha_cierre: datetime
-    movimiento_cierre: MovimientoCajaResponse
+    movimiento_cierre: list[MovimientoCajaResponse]
     cierres: list[CajaCierreDetalleResponse]
 
     class Config:

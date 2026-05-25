@@ -59,6 +59,18 @@ class SubcategoriaProductoResponse(BaseModel):
         from_attributes = True
 
 
+class CategoriaProductoConSubcategoriasResponse(BaseModel):
+    id_categoria_producto: int
+    id_empresa: int | None
+    nombre: str
+    descripcion: str | None
+    activo: bool
+    subcategorias: list[SubcategoriaProductoResponse]
+
+    class Config:
+        from_attributes = True
+
+
 class ProductoBase(BaseModel):
     id_subcategoria: int
     nombre: str = Field(max_length=150)

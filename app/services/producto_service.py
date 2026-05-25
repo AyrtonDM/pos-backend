@@ -9,6 +9,7 @@ from app.models.usuarios.usuario import Usuario
 from app.services.inventario_service import InventarioService
 from app.repositories.producto_repository import ProductoRepository
 from app.schemas.producto_schema import (
+    CategoriaProductoConSubcategoriasResponse,
     CategoriaProductoResponse,
     ProductoCreate,
     ProductoResponse,
@@ -45,6 +46,20 @@ class ProductoService:
             "nombre": categoria.nombre,
             "descripcion": categoria.descripcion,
             "activo": categoria.activo,
+        }
+
+    @staticmethod
+    def _serializar_categoria_con_subcategorias(categoria) -> dict:
+        subcategorias = sorted(
+            getattr(categoria, "subcategorias", []) or [],
+            key=lambda subcategoria: (subcategoria.nombre or "").lower(),
+        )
+        return {
+            **ProductoService._serializar_categoria(categoria),
+            "subcategorias": [
+                ProductoService._serializar_subcategoria(subcategoria)
+                for subcategoria in subcategorias
+            ],
         }
 
     @staticmethod
@@ -95,6 +110,28 @@ class ProductoService:
     def listar_categorias(db: Session):
         categorias = ProductoRepository.obtener_categorias(db)
         return [CategoriaProductoResponse.model_validate(ProductoService._serializar_categoria(categoria)) for categoria in categorias]
+
+    @staticmethod
+    def listar_categorias_con_subcategorias_por_empresa(
+        db: Session,
+        current_user: Usuario,
+        id_empresa: int,
+    ) -> list[CategoriaProductoConSubcategoriasResponse]:
+        ProductoService._validar_empresa_del_usuario(
+            db=db,
+            current_user=current_user,
+            id_empresa=id_empresa,
+        )
+        categorias = ProductoRepository.obtener_categorias_por_empresa(
+            db=db,
+            id_empresa=id_empresa,
+        )
+        return [
+            CategoriaProductoConSubcategoriasResponse.model_validate(
+                ProductoService._serializar_categoria_con_subcategorias(categoria)
+            )
+            for categoria in categorias
+        ]
 
     @staticmethod
     def crear_categoria(
@@ -254,6 +291,20 @@ class ProductoService:
     def listar_productos(db: Session, current_user: Usuario):
         ProductoService._validar_usuario_activo(current_user)
         productos = ProductoRepository.obtener_productos(db)
+        return [ProductoResponse.model_validate(ProductoService._serializar_producto(producto)) for producto in productos]
+
+    @staticmethod
+    def listar_productos_por_empresa(
+        db: Session,
+        current_user: Usuario,
+        id_empresa: int,
+    ) -> list[ProductoResponse]:
+        ProductoService._validar_empresa_del_usuario(
+            db=db,
+            current_user=current_user,
+            id_empresa=id_empresa,
+        )
+        productos = ProductoRepository.obtener_productos_por_empresa(db=db, id_empresa=id_empresa)
         return [ProductoResponse.model_validate(ProductoService._serializar_producto(producto)) for producto in productos]
 
     @staticmethod
