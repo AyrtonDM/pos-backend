@@ -17,11 +17,20 @@ from app.models.empresas import CajaSesion
 
 class VentaService:
     @staticmethod
+    def _validar_caja_sesion_del_usuario(caja_sesion: CajaSesion, current_user) -> None:
+        if getattr(current_user, "id_usuario", None) is None:
+            raise HTTPException(status_code=403, detail="Usuario no valido para esta operacion.")
+        if caja_sesion.id_usuario != current_user.id_usuario:
+            raise HTTPException(status_code=403, detail="La caja sesion no fue creada por el usuario actual.")
+
+    @staticmethod
     def crear_venta_completa(db: Session, current_user, id_caja_sesion: int, payload) -> dict:
         # Validar caja_sesion
         caja_sesion: CajaSesion | None = CajaRepository.obtener_caja_sesion_por_id(db, id_caja_sesion)
         if not caja_sesion:
             raise HTTPException(status_code=404, detail="Caja sesion no encontrada.")
+
+        VentaService._validar_caja_sesion_del_usuario(caja_sesion=caja_sesion, current_user=current_user)
 
         # validar pertenencia de la empresa
         if getattr(current_user, "id_empresa", None) is not None and caja_sesion.caja.sucursal.id_empresa != current_user.id_empresa:
@@ -161,4 +170,26 @@ class VentaService:
             raise
         except Exception as e:
             db.rollback()
+            raise HTTPException(status_code=500, detail=str(e))
+
+    @staticmethod
+    def obtener_historial_por_caja_sesion(
+        db: Session,
+        current_user,
+        id_caja_sesion: int,
+    ) -> list:
+        caja_sesion: CajaSesion | None = CajaRepository.obtener_caja_sesion_por_id(db, id_caja_sesion)
+        if not caja_sesion:
+            raise HTTPException(status_code=404, detail="Caja sesion no encontrada.")
+
+        VentaService._validar_caja_sesion_del_usuario(caja_sesion=caja_sesion, current_user=current_user)
+
+        if getattr(current_user, "id_empresa", None) is not None and caja_sesion.caja.sucursal.id_empresa != current_user.id_empresa:
+            raise HTTPException(status_code=403, detail="La caja sesion no pertenece a la empresa del usuario.")
+
+        try:
+            return VentaRepository.obtener_ventas_por_caja_sesion(db=db, id_caja_sesion=id_caja_sesion)
+        except HTTPException:
+            raise
+        except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))

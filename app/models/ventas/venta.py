@@ -28,3 +28,17 @@ class Venta(Base):
     usuario = relationship("Usuario", back_populates="ventas")
     pagos = relationship("VentaPago", back_populates="venta", cascade="all, delete-orphan")
     detalles = relationship("DetalleVenta", back_populates="venta", cascade="all, delete-orphan")
+
+    @property
+    def pago_principal(self):
+        return self.pagos[0] if self.pagos else None
+
+    @property
+    def id_metodo_pago(self):
+        pago = self.pago_principal
+        return pago.id_metodo_pago if pago else None
+
+    @property
+    def metodo_pago(self):
+        pago = self.pago_principal
+        return pago.metodo_pago if pago else None

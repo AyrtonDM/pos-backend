@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
+import logging
 from sqlalchemy.orm import Session
 
 from app.core.database import SessionLocal
@@ -15,6 +16,8 @@ from app.schemas.inventario_schema import MovimientoListResponse
 from app.services.inventario_service import InventarioService
 
 router = APIRouter(prefix="/api/inventario", tags=["inventario"])
+
+logger = logging.getLogger(__name__)
 
 
 def get_db():
@@ -44,6 +47,18 @@ def crear_movimiento(
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(get_current_user),
 ):
+    # Log incoming request for debugging (temporary)
+    try:
+        user_id = getattr(current_user, 'id_usuario', None)
+    except Exception:
+        user_id = None
+    logger.debug(
+        "crear_movimiento called: empresa=%s sucursal=%s user=%s datos=%s",
+        id_empresa,
+        id_sucursal,
+        user_id,
+        str(datos),
+    )
     try:
         return InventarioService.crear_movimiento(
             db=db,
@@ -57,6 +72,7 @@ def crear_movimiento(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception:
+        logger.exception("Error al crear movimiento para empresa=%s sucursal=%s", id_empresa, id_sucursal)
         raise HTTPException(status_code=500, detail="Error al registrar el movimiento.")
 
 

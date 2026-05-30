@@ -488,9 +488,9 @@ class CajaService:
             raise ValueError("La sesion de caja ya esta cerrada.")
 
         cierres_creados: list[CajaCierreDetalle] = []
+        movimientos_cierre: list[MovimientoCaja] = []
         total_monto_real = Decimal("0.00")
         total_monto_esperado = Decimal("0.00")
-        movimiento_cierre: MovimientoCaja | None = None
 
         try:
             for cierre in cierres:
@@ -515,33 +515,35 @@ class CajaService:
                 total_monto_real += Decimal(detalle.monto_real or 0)
                 total_monto_esperado += Decimal(detalle.monto_esperado or 0)
 
+                tipo_cierre = db.query(TipoMovimientoCaja).filter(
+                    TipoMovimientoCaja.nombre == "CIERRE"
+                ).first()
+                if tipo_cierre is None:
+                    raise LookupError("Tipo de movimiento CIERRE no encontrado.")
+
+                movimiento_cierre = MovimientoCajaRepository.crear_movimiento(
+                    db=db,
+                    datos={
+                        "id_metodo_pago": detalle.id_metodo_pago,
+                        "id_tipo_movimiento_caja": tipo_cierre.id_tipo_movimiento_caja,
+                        "id_caja_sesion": caja_sesion.id_caja_sesion,
+                        "id_usuario": current_user.id_usuario,
+                        "fecha": datetime.now(),
+                        "monto": detalle.monto_esperado,
+                        "concepto": f"CIERRE {caja_sesion.id_caja_sesion} - {metodo_pago.nombre}",
+                    },
+                )
+                movimientos_cierre.append(movimiento_cierre)
+
             # El monto_final será exactamente la suma de los 'monto_esperado'
             caja_sesion.monto_final = total_monto_esperado
             caja_sesion.estado = "Cerrado"
             caja_sesion.fecha_cierre = datetime.now()
 
-            tipo_cierre = db.query(TipoMovimientoCaja).filter(
-                TipoMovimientoCaja.nombre == "CIERRE"
-            ).first()
-            if tipo_cierre is None:
-                raise LookupError("Tipo de movimiento CIERRE no encontrado.")
-
-            movimiento_cierre = MovimientoCajaRepository.crear_movimiento(
-                db=db,
-                datos={
-                    "id_metodo_pago": None,
-                    "id_tipo_movimiento_caja": tipo_cierre.id_tipo_movimiento_caja,
-                    "id_caja_sesion": caja_sesion.id_caja_sesion,
-                    "id_usuario": current_user.id_usuario,
-                    "fecha": datetime.now(),
-                    "monto": caja_sesion.monto_final,
-                    "concepto": f"CIERRE {caja_sesion.id_caja_sesion}",
-                },
-            )
-
             db.commit()
             db.refresh(caja_sesion)
-            db.refresh(movimiento_cierre)
+            for movimiento_cierre in movimientos_cierre:
+                db.refresh(movimiento_cierre)
             for detalle in cierres_creados:
                 db.refresh(detalle)
 
@@ -553,7 +555,7 @@ class CajaService:
                 "monto_final": caja_sesion.monto_final,
                 "estado": caja_sesion.estado,
                 "fecha_cierre": caja_sesion.fecha_cierre,
-                "movimiento_cierre": movimiento_cierre,
+                "movimiento_cierre": movimientos_cierre,
                 "cierres": cierres_creados,
             }
         except IntegrityError as exc:

@@ -59,9 +59,22 @@ class SubcategoriaProductoResponse(BaseModel):
         from_attributes = True
 
 
+class CategoriaProductoConSubcategoriasResponse(BaseModel):
+    id_categoria_producto: int
+    id_empresa: int | None
+    nombre: str
+    descripcion: str | None
+    activo: bool
+    subcategorias: list[SubcategoriaProductoResponse]
+
+    class Config:
+        from_attributes = True
+
+
 class ProductoBase(BaseModel):
     id_subcategoria: int
     nombre: str = Field(max_length=150)
+    codigo_barra: str | None = Field(default=None, max_length=100)
     descripcion: str | None = None
     unidad_medida: str = Field(max_length=50)
     precio: Decimal = Decimal("0")
@@ -75,6 +88,7 @@ class ProductoCreate(ProductoBase):
 class ProductoUpdate(BaseModel):
     id_subcategoria: int | None = None
     nombre: str | None = None
+    codigo_barra: str | None = None
     descripcion: str | None = None
     unidad_medida: str | None = None
     precio: Decimal | None = None
@@ -86,6 +100,7 @@ class ProductoResponse(BaseModel):
     id_empresa: int | None
     id_subcategoria: int | None
     nombre: str
+    codigo_barra: str | None
     descripcion: str | None
     unidad_medida: str
     precio: Decimal

@@ -8,12 +8,13 @@ from app.repositories.inventario_repository import InventarioRepository
 from app.repositories.producto_repository import ProductoRepository
 from app.repositories.sucursal_repository import SucursalRepository
 from app.schemas.inventario_schema import (
-    ActualizarStockSucursalRequest,
     MovimientoInventarioCreate,
     MovimientoInventarioResponse,
     StockProductoResponse,
+    StockUpdateRequest,
     TipoMovimientoResponse,
 )
+from app.services.notification_service import NotificationService
 
 
 class InventarioService:
@@ -59,7 +60,6 @@ class InventarioService:
             "observacion": movimiento.observacion,
             "fecha_movimiento": movimiento.fecha_movimiento,
             "stock_actual": stock_actual,
-            "producto": movimiento.producto,
             "tipo_movimiento": movimiento.tipo_movimiento,
         }
 
@@ -74,6 +74,7 @@ class InventarioService:
             "stock_maximo": stock.stock_maximo,
             "fecha_actualizacion": stock.fecha_actualizacion,
             "nombre_producto": stock.producto.nombre if stock.producto else "",
+            "codigo_barra": stock.producto.codigo_barra if stock.producto else None,
             "unidad_medida": stock.producto.unidad_medida if stock.producto else "",
             "precio": float(stock.producto.precio) if stock.producto and stock.producto.precio is not None else 0,
             "imagen": stock.producto.imagen if stock.producto else None,
@@ -143,7 +144,7 @@ class InventarioService:
         id_empresa: int,
         id_sucursal: int,
         id_producto: int,
-        payload: ActualizarStockSucursalRequest,
+        payload: StockUpdateRequest,
     ) -> StockProductoResponse:
         InventarioService._validar_empresa_y_sucursal_del_usuario(
             db=db,
@@ -272,6 +273,7 @@ class InventarioService:
                     "fecha_movimiento": fecha_actual,
                 },
             )
+            id_movimiento_creado = movimiento.id_movimiento_inventario
             stock = InventarioRepository.actualizar_stock(
                 stock=stock,
                 datos={
@@ -281,10 +283,48 @@ class InventarioService:
                 db=db,
             )
             db.commit()
-            movimiento = InventarioRepository.obtener_movimiento_por_id(
-                db=db,
-                id_movimiento_inventario=movimiento.id_movimiento_inventario,
-            )
+
+            if (
+                stock.stock_minimo is not None
+                and stock.cantidad <= stock.stock_minimo
+                and stock.producto is not None
+                and stock.sucursal is not None
+            ):
+                try:
+                    NotificationService.enviar_alerta(
+                        db=db,
+                        id_empresa=id_empresa,
+                        titulo=f'Stock bajo en "{stock.sucursal.nombre}"',
+                        mensaje=(
+                            f'El producto {stock.producto.nombre} tiene stock actual {stock.cantidad} '
+                            f'y el stock minimo es {stock.stock_minimo} en {stock.sucursal.nombre}.'
+                        ),
+                        payload={
+                            "id_producto": str(stock.id_producto),
+                            "id_sucursal": str(stock.id_sucursal),
+                            "nombre_sucursal": stock.sucursal.nombre,
+                            "direccion_sucursal": stock.sucursal.direccion,
+                            "nombre_producto": stock.producto.nombre,
+                            "stock_actual": stock.cantidad,
+                            "stock_minimo": stock.stock_minimo,
+                            "unidad_medida": stock.producto.unidad_medida,
+                        },
+                    )
+                except Exception:
+                    # The stock movement must not fail if alert delivery has a problem.
+                    pass
+            # Use a fresh session to read the movimiento after commit to avoid
+            # issues if the caller's session is in an aborted state.
+            from app.core.database import SessionLocal
+
+            read_session = SessionLocal()
+            try:
+                movimiento = InventarioRepository.obtener_movimiento_por_id(
+                    db=read_session,
+                    id_movimiento_inventario=id_movimiento_creado,
+                )
+            finally:
+                read_session.close()
             return MovimientoInventarioResponse.model_validate(
                 InventarioService._serializar_movimiento(
                     movimiento=movimiento,

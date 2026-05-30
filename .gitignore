@@ -8,3 +8,22 @@ __pycache__/
 app/media/**
 !app/media/.gitkeep
 
+# Credentials and secrets - do not commit
+# Firebase / service account keys
+serviceAccount*.json
+firebase-*.json
+firebase-admin*.json
+credentials.json
+google-credentials*.json
+
+# Environment files
+.env*
+
+# Private keys and certificates
+*.pem
+*.key
+*.crt
+*.p12
+*.jks
+
+

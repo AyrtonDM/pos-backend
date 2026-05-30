@@ -36,6 +36,7 @@ class InventarioRepository:
     ) -> Stock | None:
         return (
             db.query(Stock)
+            .options(joinedload(Stock.producto))
             .filter(
                 Stock.id_producto == id_producto,
                 Stock.id_sucursal == id_sucursal,

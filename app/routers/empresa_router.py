@@ -7,6 +7,7 @@ from app.core.security import get_current_user
 from app.models.usuarios import Usuario
 from app.schemas.producto_schema import (
     CategoriaProductoCreate,
+    CategoriaProductoConSubcategoriasResponse,
     CategoriaProductoResponse,
     ProductoCreate,
     ProductoResponse,
@@ -262,6 +263,49 @@ def listar_subcategorias_empresa(
         raise HTTPException(status_code=500, detail="Error al listar las subcategorias.")
 
 
+@router.get("/{id_empresa}/productos", response_model=list[ProductoResponse])
+def listar_productos_empresa(
+    id_empresa: int,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    try:
+        return ProductoService.listar_productos_por_empresa(
+            db=db,
+            current_user=current_user,
+            id_empresa=id_empresa,
+        )
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=401, detail=str(e))
+    except Exception:
+        raise HTTPException(status_code=500, detail="Error al listar los productos de la empresa.")
+
+
+@router.get(
+    "/{id_empresa}/categorias-con-subcategorias",
+    response_model=list[CategoriaProductoConSubcategoriasResponse],
+)
+def listar_categorias_con_subcategorias_empresa(
+    id_empresa: int,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    try:
+        return ProductoService.listar_categorias_con_subcategorias_por_empresa(
+            db=db,
+            current_user=current_user,
+            id_empresa=id_empresa,
+        )
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception:
+        raise HTTPException(status_code=500, detail="Error al listar las categorias con subcategorias.")
+
+
 @router.post("/{id_empresa}/productos", response_model=ProductoResponse)
 def crear_producto_empresa(
     id_empresa: int,
@@ -289,6 +333,7 @@ def crear_producto_con_imagen_empresa(
     id_empresa: int,
     id_subcategoria: int = Form(...),
     nombre: str = Form(...),
+    codigo_barra: str | None = Form(None),
     descripcion: str | None = Form(None),
     unidad_medida: str = Form(...),
     precio: Decimal = Form(Decimal("0")),
@@ -305,6 +350,7 @@ def crear_producto_con_imagen_empresa(
         payload = ProductoCreate(
             id_subcategoria=id_subcategoria,
             nombre=nombre,
+            codigo_barra=codigo_barra,
             descripcion=descripcion,
             unidad_medida=unidad_medida,
             precio=precio,
