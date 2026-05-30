@@ -7,6 +7,7 @@ from fastapi.staticfiles import StaticFiles
 from app.core.database import Base, engine
 from app.core.database import SessionLocal
 from app.core.schema_updates import apply_schema_updates
+from app.models.auditoria import Bitacora
 from app.models.clientes import CategoriaCliente, Cliente
 from app.models.empresas import (
     Caja,
@@ -35,6 +36,7 @@ from app.routers.sucursal_router import (
     sucursal_router,
 )
 from app.routers.notifications_router import router as notifications_router
+from app.routers.bitacora_router import router as bitacora_router
 from app.seeds import run_seeds
 from app.services.inventario_service import InventarioService
 
@@ -66,6 +68,7 @@ app.include_router(sucursal_empresa_router)
 app.include_router(sucursal_router)
 app.include_router(invitacion_router)
 app.include_router(notifications_router)
+app.include_router(bitacora_router)
 
 media_root = Path(__file__).resolve().parent / "media"
 media_root.mkdir(parents=True, exist_ok=True)
