@@ -165,6 +165,7 @@ def apply_schema_updates() -> None:
                 DROP COLUMN IF EXISTS costo,
                 ADD COLUMN IF NOT EXISTS id_empresa INTEGER,
                 ADD COLUMN IF NOT EXISTS id_subcategoria INTEGER,
+                ADD COLUMN IF NOT EXISTS codigo_barra VARCHAR(100),
                 ADD COLUMN IF NOT EXISTS descripcion TEXT,
                 ADD COLUMN IF NOT EXISTS unidad_medida VARCHAR(50),
                 ADD COLUMN IF NOT EXISTS imagen VARCHAR(255),

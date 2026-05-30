@@ -45,6 +45,7 @@ class StockProductoResponse(BaseModel):
     stock_maximo: int | None
     fecha_actualizacion: datetime
     nombre_producto: str
+    codigo_barra: str | None
     unidad_medida: str
     precio: float
     imagen: str | None

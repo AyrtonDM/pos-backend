@@ -94,6 +94,7 @@ class ProductoService:
             "id_empresa": producto.id_empresa,
             "id_subcategoria": producto.id_subcategoria,
             "nombre": producto.nombre,
+            "codigo_barra": producto.codigo_barra,
             "descripcion": producto.descripcion,
             "unidad_medida": producto.unidad_medida or "",
             "precio": producto.precio,
@@ -336,6 +337,7 @@ class ProductoService:
                     "id_empresa": id_empresa,
                     "id_subcategoria": payload.id_subcategoria,
                     "nombre": payload.nombre,
+                    "codigo_barra": payload.codigo_barra,
                     "descripcion": payload.descripcion,
                     "unidad_medida": payload.unidad_medida,
                     "precio": payload.precio,
@@ -378,6 +380,8 @@ class ProductoService:
             datos["id_subcategoria"] = payload.id_subcategoria
         if payload.nombre is not None:
             datos["nombre"] = payload.nombre
+        if payload.codigo_barra is not None:
+            datos["codigo_barra"] = payload.codigo_barra
         if payload.descripcion is not None:
             datos["descripcion"] = payload.descripcion
         if payload.unidad_medida is not None:

@@ -333,6 +333,7 @@ def crear_producto_con_imagen_empresa(
     id_empresa: int,
     id_subcategoria: int = Form(...),
     nombre: str = Form(...),
+    codigo_barra: str | None = Form(None),
     descripcion: str | None = Form(None),
     unidad_medida: str = Form(...),
     precio: Decimal = Form(Decimal("0")),
@@ -349,6 +350,7 @@ def crear_producto_con_imagen_empresa(
         payload = ProductoCreate(
             id_subcategoria=id_subcategoria,
             nombre=nombre,
+            codigo_barra=codigo_barra,
             descripcion=descripcion,
             unidad_medida=unidad_medida,
             precio=precio,

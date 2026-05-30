@@ -74,6 +74,7 @@ class InventarioService:
             "stock_maximo": stock.stock_maximo,
             "fecha_actualizacion": stock.fecha_actualizacion,
             "nombre_producto": stock.producto.nombre if stock.producto else "",
+            "codigo_barra": stock.producto.codigo_barra if stock.producto else None,
             "unidad_medida": stock.producto.unidad_medida if stock.producto else "",
             "precio": float(stock.producto.precio) if stock.producto and stock.producto.precio is not None else 0,
             "imagen": stock.producto.imagen if stock.producto else None,
