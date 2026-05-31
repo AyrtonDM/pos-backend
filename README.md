@@ -55,3 +55,43 @@ pip install -r requirements.txt
 
 ### Para ejecutar el proyecto
 uvicorn app.main:app --reload
+
+## Reportes dinamicos con IA
+
+El backend incluye el modulo `/api/reportes` para interpretar y ejecutar reportes dinamicos en espanol.
+
+### Variables necesarias
+
+En tu archivo `.env` agrega, si corresponde, la clave de OpenAI y el modelo a usar:
+
+```env
+OPENAI_API_KEY=tu_clave
+OPENAI_REPORT_MODEL=gpt5.4mini
+REPORTES_USAR_OPENAI=true
+```
+
+Si no hay clave, el sistema usa una interpretacion local por plantilla como respaldo.
+Si quieres probar sin llamar a OpenAI, usa `REPORTES_USAR_OPENAI=false`.
+
+### Endpoints
+
+- `GET /api/reportes/plantillas`
+- `POST /api/reportes/{empresa_id}/run`
+- `POST /api/reportes/{empresa_id}/interpretar`
+
+El endpoint principal para consumir desde el front es `POST /api/reportes/{empresa_id}/run`.
+Recibe solo el `prompt` en el body y usa el `empresa_id` de la ruta para buscar los datos de esa empresa.
+
+Ejemplo:
+
+```json
+{
+	"prompt": "Resumen de ventas del ultimo mes"
+}
+```
+
+### Prueba rapida
+
+```powershell
+python scripts/probar_reportes.py
+```

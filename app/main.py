@@ -26,6 +26,7 @@ from app.routers.empresa_router import router as empresa_router
 from app.routers.auth_router import router as auth_router
 from app.routers.inventario_router import router as inventario_router
 from app.routers.producto_router import router as producto_router
+from app.routers.reportes_router import router as reportes_router
 from app.routers.venta_router import venta_router
 from app.routers.empresa_tipo_movimiento_caja_router import tipo_movimiento_caja_router
 from app.routers.sucursal_router import (
@@ -66,6 +67,7 @@ app.include_router(sucursal_empresa_router)
 app.include_router(sucursal_router)
 app.include_router(invitacion_router)
 app.include_router(notifications_router)
+app.include_router(reportes_router)
 
 media_root = Path(__file__).resolve().parent / "media"
 media_root.mkdir(parents=True, exist_ok=True)
