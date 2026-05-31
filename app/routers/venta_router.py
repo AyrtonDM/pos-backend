@@ -7,6 +7,7 @@ from app.schemas.venta_schema import MetodoPagoResponse, TipoVentaResponse
 from app.schemas.venta_schema import VentaCreate, VentaResponse
 from app.core.security import get_current_user
 from app.services.venta_service import VentaService
+from app.services.bitacora_service import registrar_accion
 from fastapi import Depends
 from app.models.usuarios.usuario import Usuario
 
@@ -51,6 +52,22 @@ def listar_metodos_pago(db: Session = Depends(get_db)):
 @venta_router.post("/sesiones/{id_caja_sesion}/ventas", response_model=VentaResponse)
 def crear_venta(id_caja_sesion: int, datos: VentaCreate, db: Session = Depends(get_db), current_user: Usuario = Depends(get_current_user)):
     resultado = VentaService.crear_venta_completa(db=db, current_user=current_user, id_caja_sesion=id_caja_sesion, payload=datos)
+    
+    # Registrar en bitácora
+    try:
+        # Extraer IDs de productos de los detalles de venta
+        ids_productos = [str(d.id_producto) for d in datos.detalle_venta]
+        ids_str = ", ".join(ids_productos)
+        usuario_nombre = current_user.persona.nombre_completo if current_user.persona else current_user.email
+        
+        registrar_accion(
+            usuario_nombre=usuario_nombre,
+            accion=f"Registró una venta con productos id: {ids_str}"
+        )
+    except Exception:
+        # Si falla la bitácora, no afectar la venta
+        pass
+    
     return resultado["venta"]
 
 
