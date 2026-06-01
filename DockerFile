@@ -1,0 +1,26 @@
+FROM python:3.11-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+	PYTHONUNBUFFERED=1
+
+WORKDIR /app
+
+COPY requirements.txt ./
+
+RUN pip install --no-cache-dir --upgrade pip \
+	&& pip install --no-cache-dir -r requirements.txt
+
+COPY app/__init__.py ./app/__init__.py
+COPY app/main.py ./app/main.py
+COPY app/core ./app/core
+COPY app/models ./app/models
+COPY app/repositories ./app/repositories
+COPY app/routers ./app/routers
+COPY app/schemas ./app/schemas
+COPY app/seeds ./app/seeds
+COPY app/services ./app/services
+COPY app/utils ./app/utils
+
+EXPOSE 8000
+
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

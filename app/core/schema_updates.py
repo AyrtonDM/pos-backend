@@ -305,3 +305,34 @@ def apply_schema_updates() -> None:
                 """
             )
         )
+        # ---------------------------------------------------------------
+        # Stripe Checkout — trazabilidad e idempotencia en historial_suscripcion
+        # ---------------------------------------------------------------
+        connection.execute(
+            text(
+                """
+                ALTER TABLE historial_suscripcion
+                ADD COLUMN IF NOT EXISTS stripe_session_id         VARCHAR(255),
+                ADD COLUMN IF NOT EXISTS stripe_payment_intent_id  VARCHAR(255),
+                ADD COLUMN IF NOT EXISTS stripe_payment_status     VARCHAR(50)
+                """
+            )
+        )
+        connection.execute(
+            text(
+                """
+                DO $$
+                BEGIN
+                    IF NOT EXISTS (
+                        SELECT 1
+                        FROM pg_constraint
+                        WHERE conname = 'uq_historial_suscripcion_stripe_session'
+                    ) THEN
+                        ALTER TABLE historial_suscripcion
+                        ADD CONSTRAINT uq_historial_suscripcion_stripe_session
+                        UNIQUE (stripe_session_id);
+                    END IF;
+                END $$;
+                """
+            )
+        )

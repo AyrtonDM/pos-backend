@@ -2,7 +2,10 @@
 from sqlalchemy.orm import Session
 from sqlalchemy.orm import joinedload
 
+from sqlalchemy.orm import joinedload
 from app.models.empresas import Empresa
+from app.models.empresas.historial_suscripcion import HistorialSuscripcion
+
 from app.models.usuarios import Usuario
 from app.models.usuarios.modulo import Modulo
 from app.models.usuarios.permiso import Permiso
@@ -240,6 +243,7 @@ class EmpresaRepository:
         return (
             db.query(Empresa)
             .join(UsuarioRol, UsuarioRol.id_empresa == Empresa.id_empresa)
+            .options(joinedload(Empresa.historial_suscripciones).joinedload(HistorialSuscripcion.plan))
             .filter(
                 UsuarioRol.id_usuario == id_usuario,
                 UsuarioRol.activo.is_(True),
@@ -256,6 +260,7 @@ class EmpresaRepository:
         return (
             db.query(Empresa)
             .join(UsuarioRol, UsuarioRol.id_empresa == Empresa.id_empresa)
+            .options(joinedload(Empresa.historial_suscripciones).joinedload(HistorialSuscripcion.plan))
             .filter(
                 UsuarioRol.id_usuario == id_usuario,
                 UsuarioRol.id_rol == id_rol,
@@ -274,6 +279,7 @@ class EmpresaRepository:
         return (
             db.query(Empresa)
             .join(UsuarioRol, UsuarioRol.id_empresa == Empresa.id_empresa)
+            .options(joinedload(Empresa.historial_suscripciones).joinedload(HistorialSuscripcion.plan))
             .filter(
                 Empresa.id_empresa == id_empresa,
                 UsuarioRol.id_usuario == id_usuario,

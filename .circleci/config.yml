@@ -1,0 +1,60 @@
+version: 2.1
+
+orbs:
+  python: circleci/python@2
+
+jobs:
+  test-python:
+    docker:
+      - image: cimg/python:3.12
+    steps:
+      - checkout
+      - run:
+          name: Install dependencies
+          command: |
+            python -m pip install --upgrade pip
+            python -m pip install pytest
+            python -m pip install -r requirements.txt
+      - run:
+          name: Run tests
+          command: python -m pytest --junitxml=junit.xml || ((($? == 5)) && echo 'Did not find any tests to run.')
+      - store_test_results:
+          path: junit.xml
+
+  deploy-to-ec2:
+    docker:
+      - image: cimg/base:stable # Imagen ligera solo para hacer SSH
+    steps:
+      - add_ssh_keys:
+          fingerprints:
+            - "SHA256:uCVfqBjyVKiA0cwiL8ppWVv5CM9/WB7ru1sl6w3VfVQ"
+
+      - run:
+          name: Add EC2 to known_hosts
+          command: |
+            ssh-keyscan -H $EC2_HOST >> ~/.ssh/known_hosts
+
+      - run:
+          name: Deploy FastAPI with Docker Compose on EC2
+          command: |
+            ssh $EC2_USERNAME@$EC2_HOST "bash -lc '
+              set -euo pipefail
+              cd ${EC2_APP_PATH}
+              git fetch origin main
+              git reset --hard origin/main
+              docker compose up -d --build --remove-orphans
+            '"
+
+workflows:
+  build-and-test:
+    jobs:
+      - test-python:
+          filters:
+            branches:
+              only: main
+      - deploy-to-ec2:
+          requires:
+            - test-python
+          filters:
+            branches:
+              only: main
