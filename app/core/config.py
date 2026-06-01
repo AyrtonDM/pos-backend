@@ -41,11 +41,11 @@ def obtener_stripe_webhook_secret() -> str:
 
 
 def obtener_stripe_success_url() -> str:
-    return os.getenv("STRIPE_SUCCESS_URL", "http://localhost:4200/pago/exitoso")
+    return os.getenv("STRIPE_SUCCESS_URL", "http://localhost:4200/administrator/payment/success")
 
 
 def obtener_stripe_cancel_url() -> str:
-    return os.getenv("STRIPE_CANCEL_URL", "http://localhost:4200/pago/cancelado")
+    return os.getenv("STRIPE_CANCEL_URL", "http://localhost:4200/administrator/payment/cancel")
 
 
 # ---------------------------------------------------------------------------
