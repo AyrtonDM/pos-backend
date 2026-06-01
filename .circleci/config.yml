@@ -45,6 +45,9 @@ workflows:
   build-and-test:
     jobs:
       - test-python
+          filters:
+            branches:
+              only: main
       - deploy-to-ec2:
           requires:
             - test-python
