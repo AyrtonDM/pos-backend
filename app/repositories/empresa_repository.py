@@ -4,7 +4,10 @@ from sqlalchemy.orm import joinedload
 
 from app.models.empresas import Empresa
 from app.models.usuarios import Usuario
+from app.models.usuarios.modulo import Modulo
+from app.models.usuarios.permiso import Permiso
 from app.models.usuarios.rol import Rol
+from app.models.usuarios.rol_permiso import RolPermiso
 from app.models.usuarios.usuario_rol import UsuarioRol
 
 
@@ -41,6 +44,46 @@ class EmpresaRepository:
     @staticmethod
     def obtener_rol_por_nombre(db: Session, nombre: str) -> Rol | None:
         return db.query(Rol).filter(Rol.nombre == nombre).first()
+
+    @staticmethod
+    def obtener_usuario_rol_activo_distinto_cliente(
+        db: Session,
+        id_usuario: int,
+        id_empresa: int,
+    ) -> UsuarioRol | None:
+        return (
+            db.query(UsuarioRol)
+            .options(joinedload(UsuarioRol.rol))
+            .join(Rol, Rol.id_rol == UsuarioRol.id_rol)
+            .filter(
+                UsuarioRol.id_usuario == id_usuario,
+                UsuarioRol.id_empresa == id_empresa,
+                UsuarioRol.activo.is_(True),
+                Rol.nombre != "CLIENTE",
+            )
+            .order_by(UsuarioRol.id_usuario_rol.asc())
+            .first()
+        )
+
+    @staticmethod
+    def obtener_permisos_por_rol(db: Session, id_rol: int) -> list[tuple[Permiso, bool]]:
+        return (
+            db.query(Permiso, RolPermiso.activo)
+            .join(RolPermiso, RolPermiso.id_permiso == Permiso.id_permiso)
+            .options(joinedload(Permiso.modulo))
+            .filter(RolPermiso.id_rol == id_rol)
+            .order_by(Permiso.id_permiso.asc())
+            .all()
+        )
+
+    @staticmethod
+    def obtener_permisos_agrupados_por_modulo(db: Session) -> list[Modulo]:
+        return (
+            db.query(Modulo)
+            .options(joinedload(Modulo.permisos))
+            .order_by(Modulo.id_modulo.asc())
+            .all()
+        )
 
     @staticmethod
     def obtener_empresa_por_id(db: Session, id_empresa: int) -> Empresa | None:

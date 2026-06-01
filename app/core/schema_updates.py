@@ -8,6 +8,41 @@ def apply_schema_updates() -> None:
         connection.execute(
             text(
                 """
+                ALTER TABLE rol
+                ADD COLUMN IF NOT EXISTS tipo VARCHAR(50)
+                """
+            )
+        )
+        connection.execute(
+            text(
+                """
+                ALTER TABLE rol
+                ADD COLUMN IF NOT EXISTS id_empresa INTEGER
+                """
+            )
+        )
+        connection.execute(
+            text(
+                """
+                DO $$
+                BEGIN
+                    IF NOT EXISTS (
+                        SELECT 1
+                        FROM pg_constraint
+                        WHERE conname = 'fk_rol_empresa'
+                    ) THEN
+                        ALTER TABLE rol
+                        ADD CONSTRAINT fk_rol_empresa
+                        FOREIGN KEY (id_empresa)
+                        REFERENCES empresa(id_empresa);
+                    END IF;
+                END $$;
+                """
+            )
+        )
+        connection.execute(
+            text(
+                """
                 ALTER TABLE usuario_rol
                 ADD COLUMN IF NOT EXISTS id_sucursal INTEGER
                 """

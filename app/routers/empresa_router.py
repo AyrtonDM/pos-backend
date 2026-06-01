@@ -20,6 +20,7 @@ from app.schemas.cliente_schema import (
     ClienteUpdate,
 )
 from app.schemas.empresa_schema import EmpresaCreate, EmpresaResponse, EmpresaUpdate
+from app.schemas.permiso_schema import PermisoConRolPermisoResponse, PermisoResponse, PermisosPorModuloResponse
 from app.services.cliente_service import ClienteService
 from app.services.empresa_service import EmpresaService
 from app.services.producto_service import ProductoService
@@ -71,6 +72,42 @@ def obtener_empresas_del_usuario_como_empleado(
             status_code=500,
             detail="Error al obtener las empresas del empleado.",
         )
+
+
+@router.get("/permisos-por-modulo", response_model=list[PermisosPorModuloResponse])
+def listar_permisos_agrupados_por_modulo(
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    try:
+        return EmpresaService.obtener_permisos_agrupados_por_modulo(
+            db=db,
+            current_user=current_user,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=401, detail=str(e))
+    except Exception:
+        raise HTTPException(status_code=500, detail="Error al listar los permisos por modulo.")
+
+
+@router.get("/{id_empresa}/mis-permisos", response_model=list[PermisoConRolPermisoResponse])
+def obtener_permisos_del_rol_del_usuario_en_empresa(
+    id_empresa: int,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    try:
+        return EmpresaService.obtener_permisos_del_rol_del_usuario_en_empresa(
+            db=db,
+            current_user=current_user,
+            id_empresa=id_empresa,
+        )
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=401, detail=str(e))
+    except Exception:
+        raise HTTPException(status_code=500, detail="Error al obtener los permisos del rol.")
 
 
 @router.get("/{id_empresa}", response_model=EmpresaResponse)
