@@ -20,3 +20,8 @@ class Empresa(Base):
     productos = relationship("Producto", back_populates="empresa")
     sucursales = relationship("Sucursal", back_populates="empresa", cascade="all, delete-orphan")
     usuario_roles = relationship("UsuarioRol", back_populates="empresa")
+    historial_suscripciones = relationship(
+        "HistorialSuscripcion",
+        back_populates="empresa",
+        cascade="all, delete-orphan",
+    )
