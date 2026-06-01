@@ -23,7 +23,7 @@ jobs:
     steps:
       - add_ssh_keys:
           fingerprints:
-            - "	SHA256:uCVfqBjyVKiA0cwiL8ppWVv5CM9/WB7ru1sl6w3VfVQ"
+            - "SHA256:uCVfqBjyVKiA0cwiL8ppWVv5CM9/WB7ru1sl6w3VfVQ"
 
       - run:
           name: Add EC2 to known_hosts
@@ -44,7 +44,7 @@ jobs:
 workflows:
   build-and-test:
     jobs:
-      - test-python
+      - test-python:
           filters:
             branches:
               only: main
