@@ -18,6 +18,15 @@ class EmpresaUpdate(BaseModel):
     activo: bool
 
 
+class SuscripcionActivaResponse(BaseModel):
+    estado: str
+    fecha_fin: date | None
+    plan_nombre: str
+
+    class Config:
+        from_attributes = True
+
+
 class EmpresaResponse(BaseModel):
     id_empresa: int
     nombre: str
@@ -26,6 +35,7 @@ class EmpresaResponse(BaseModel):
     correo: EmailStr
     fecha_creacion: date
     activo: bool
+    suscripcion_activa: SuscripcionActivaResponse | None = None
 
     class Config:
         from_attributes = True

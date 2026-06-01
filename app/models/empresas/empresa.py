@@ -25,3 +25,16 @@ class Empresa(Base):
         back_populates="empresa",
         cascade="all, delete-orphan",
     )
+
+    @property
+    def suscripcion_activa(self):
+        from datetime import date
+        hoy = date.today()
+        for suscripcion in self.historial_suscripciones:
+            if suscripcion.estado == "activo" and (suscripcion.fecha_fin is None or suscripcion.fecha_fin >= hoy):
+                return {
+                    "estado": suscripcion.estado,
+                    "fecha_fin": suscripcion.fecha_fin,
+                    "plan_nombre": suscripcion.plan.nombre if suscripcion.plan else "Desconocido"
+                }
+        return None
