@@ -135,7 +135,7 @@ def send_employee_invitation_email(
             <body style="font-family: Arial, sans-serif; background-color: #f4f4f4; padding: 20px;">
                 <div style="background-color: white; padding: 20px; border-radius: 8px; max-width: 600px; margin: 0 auto;">
                     <h2 style="color: #333;">Hola, {nombre}</h2>
-                    <p style="color: #666;">Recibiste una invitacion para unirte como empleado a una sucursal.</p>
+                    <p style="color: #666;">Recibiste una invitacion para unirte como empleado.</p>
                     <p style="color: #666;">Para aceptar la invitacion, ingresa al siguiente link:</p>
                     <p style="margin: 20px 0;">
                         <a href="{invitation_link}" style="background-color: #007bff; color: white; padding: 12px 16px; text-decoration: none; border-radius: 5px;">
@@ -155,7 +155,7 @@ def send_employee_invitation_email(
         message["To"] = email
 
         text_content = (
-            "Recibiste una invitacion para unirte como empleado a una sucursal.\n"
+            "Recibiste una invitacion para unirte como empleado.\n"
             f"Acepta la invitacion aqui: {invitation_link}"
         )
         message.attach(MIMEText(text_content, "plain"))

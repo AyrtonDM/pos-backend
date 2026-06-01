@@ -150,10 +150,9 @@ def obtener_sucursal(
         raise HTTPException(status_code=500, detail="Error al obtener la sucursal.")
 
 
-@empresa_router.post("/{id_empresa}/sucursales/{id_sucursal}/invitar-empleado")
+@empresa_router.post("/{id_empresa}/invitar-empleado")
 def invitar_empleado(
     id_empresa: int,
-    id_sucursal: int,
     datos: InvitacionEmpleadoCreate,
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(get_current_user),
@@ -163,8 +162,9 @@ def invitar_empleado(
             db=db,
             current_user=current_user,
             id_empresa=id_empresa,
-            id_sucursal=id_sucursal,
             email=datos.email,
+            id_sucursales=datos.id_sucursales,
+            id_rol=datos.id_rol,
         )
     except LookupError as e:
         raise HTTPException(status_code=404, detail=str(e))
@@ -533,19 +533,15 @@ def obtener_mis_sucursales_empleado(
         raise HTTPException(status_code=500, detail="Error al obtener las sucursales.")
 
 
-@invitacion_router.get("/empleado/aceptar/{id_empresa}/{id_sucursal}/{id_usuario}")
+@invitacion_router.get("/empleado/aceptar/{token}")
 def aceptar_invitacion_empleado(
-    id_empresa: int,
-    id_sucursal: int,
-    id_usuario: int,
+    token: str,
     db: Session = Depends(get_db),
 ):
     try:
         return SucursalService.aceptar_invitacion_empleado(
             db=db,
-            id_empresa=id_empresa,
-            id_sucursal=id_sucursal,
-            id_usuario=id_usuario,
+            token=token,
         )
     except LookupError as e:
         raise HTTPException(status_code=404, detail=str(e))

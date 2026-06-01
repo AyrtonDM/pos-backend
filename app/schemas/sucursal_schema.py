@@ -1,6 +1,6 @@
 from datetime import date
 
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field, PositiveInt
 
 from app.schemas.cliente_schema import ClienteResponse
 
@@ -22,6 +22,8 @@ class SucursalUpdate(BaseModel):
 
 class InvitacionEmpleadoCreate(BaseModel):
     email: EmailStr
+    id_sucursales: list[PositiveInt] = Field(..., min_length=1)
+    id_rol: PositiveInt
 
 
 class InvitacionClienteCreate(BaseModel):
