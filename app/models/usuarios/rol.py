@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, Column, Integer, String
+from sqlalchemy import Boolean, Column, ForeignKey, Integer, String
 from sqlalchemy.orm import relationship
 
 from app.core.database import Base
@@ -9,6 +9,8 @@ class Rol(Base):
 
     id_rol = Column(Integer, primary_key=True, index=True)
     nombre = Column(String(100), nullable=False, unique=True)
+    id_empresa = Column(ForeignKey("empresa.id_empresa"), nullable=True, index=True)
+    tipo = Column(String(50), nullable=True)
     descripcion = Column(String(255), nullable=False)
     activo = Column(Boolean, default=True, nullable=False)
 

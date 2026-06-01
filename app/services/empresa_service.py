@@ -4,8 +4,8 @@ from datetime import date
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.repositories.empresa_repository import EmpresaRepository
 from app.models.usuarios import Usuario
+from app.repositories.empresa_repository import EmpresaRepository
 
 
 class EmpresaService:
@@ -109,6 +109,66 @@ class EmpresaService:
             id_usuario=current_user.id_usuario,
             id_rol=rol_empleado.id_rol,
         )
+
+    @staticmethod
+    def obtener_permisos_del_rol_del_usuario_en_empresa(
+        db: Session,
+        current_user: Usuario,
+        id_empresa: int,
+    ):
+        if current_user is None or not current_user.activo:
+            raise ValueError("Usuario no autorizado o inactivo.")
+
+        usuario_rol = EmpresaRepository.obtener_usuario_rol_activo_distinto_cliente(
+            db=db,
+            id_usuario=current_user.id_usuario,
+            id_empresa=id_empresa,
+        )
+        if usuario_rol is None:
+            raise LookupError("No se encontro un rol distinto de cliente para este usuario en esta empresa.")
+
+        permisos_y_activos = EmpresaRepository.obtener_permisos_por_rol(
+            db=db,
+            id_rol=usuario_rol.id_rol,
+        )
+
+        return [
+            {
+                "id_permiso": permiso.id_permiso,
+                "codigo": permiso.codigo,
+                "nombre": permiso.nombre,
+                "id_modulo": permiso.id_modulo,
+                "modulo": permiso.modulo,
+                "activo_rol_permiso": bool(rol_permiso_activo),
+            }
+            for permiso, rol_permiso_activo in permisos_y_activos
+        ]
+
+    @staticmethod
+    def obtener_permisos_agrupados_por_modulo(
+        db: Session,
+        current_user: Usuario,
+    ):
+        if current_user is None or not current_user.activo:
+            raise ValueError("Usuario no autorizado o inactivo.")
+
+        modulos = EmpresaRepository.obtener_permisos_agrupados_por_modulo(db=db)
+        return [
+            {
+                "id_modulo": modulo.id_modulo,
+                "codigo": modulo.codigo,
+                "nombre": modulo.nombre,
+                "permisos": [
+                    {
+                        "id_permiso": permiso.id_permiso,
+                        "codigo": permiso.codigo,
+                        "nombre": permiso.nombre,
+                    }
+                    for permiso in sorted(modulo.permisos, key=lambda item: item.id_permiso)
+                ],
+            }
+            for modulo in modulos
+        ]
 
     @staticmethod
     def obtener_empresa_del_usuario(
