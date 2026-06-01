@@ -1,34 +1,53 @@
-# This config was automatically generated from your source code
-# Stacks detected: deps:python:.
 version: 2.1
+
 orbs:
   python: circleci/python@2
+
 jobs:
   test-python:
-    # Install dependencies and run tests
     docker:
       - image: cimg/python:3.12
     steps:
       - checkout
-      - python/install-packages
+      - python/install-packages:
+          pkg-manager: pip # Asegura que use pip y requirements.txt
       - run:
           name: Run tests
           command: pytest --junitxml=junit.xml || ((($? == 5)) && echo 'Did not find any tests to run.')
       - store_test_results:
           path: junit.xml
-  deploy:
-    # This is an example deploy job, not actually used by the workflow
+
+  deploy-to-ec2:
     docker:
-      - image: cimg/base:stable
+      - image: cimg/base:stable # Imagen ligera solo para hacer SSH
     steps:
-      # Replace this with steps to deploy to users
+      - add_ssh_keys:
+          fingerprints:
+            - "	SHA256:uCVfqBjyVKiA0cwiL8ppWVv5CM9/WB7ru1sl6w3VfVQ"
+
       - run:
-          name: deploy
-          command: '#e.g. ./deploy.sh'
+          name: Add EC2 to known_hosts
+          command: |
+            ssh-keyscan -H $EC2_HOST >> ~/.ssh/known_hosts
+
+      - run:
+          name: Deploy FastAPI with Docker Compose on EC2
+          command: |
+            ssh $EC2_USERNAME@$EC2_HOST "bash -lc '
+              set -euo pipefail
+              cd ${EC2_APP_PATH}
+              git fetch origin main
+              git reset --hard origin/main
+              docker compose up -d --build --remove-orphans
+            '"
+
 workflows:
   build-and-test:
     jobs:
       - test-python
-    # - deploy:
-    #     requires:
-    #       - test-python
+      - deploy-to-ec2:
+          requires:
+            - test-python
+          filters:
+            branches:
+              only: main
