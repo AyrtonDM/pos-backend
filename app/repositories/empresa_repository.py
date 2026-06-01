@@ -184,6 +184,24 @@ class EmpresaRepository:
         )
 
     @staticmethod
+    def obtener_personal_por_empresa_excluyendo_roles(
+        db: Session,
+        id_empresa: int,
+        roles_excluidos: list[str],
+    ) -> list[UsuarioRol]:
+        return (
+            db.query(UsuarioRol)
+            .join(Rol, Rol.id_rol == UsuarioRol.id_rol)
+            .options(joinedload(UsuarioRol.usuario).joinedload(Usuario.persona))
+            .filter(
+                UsuarioRol.id_empresa == id_empresa,
+                UsuarioRol.activo.is_(True),
+                Rol.nombre.notin_(roles_excluidos),
+            )
+            .all()
+        )
+
+    @staticmethod
     def obtener_usuarios_rol_por_empresa_y_rol_sin_sucursal(
         db: Session,
         id_empresa: int,

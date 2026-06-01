@@ -65,6 +65,19 @@ class EmpleadoSucursalResponse(BaseModel):
         from_attributes = True
 
 
+class PersonalEmpresaResponse(BaseModel):
+    id_usuario_rol: int
+    id_usuario: int
+    id_rol: int
+    id_empresa: int
+    id_sucursal: int | None
+    activo: bool
+    usuario: UsuarioEmpleadoResponse
+
+    class Config:
+        from_attributes = True
+
+
 class ClienteEmpresaResponse(BaseModel):
     id_usuario_rol: int
     id_usuario: int

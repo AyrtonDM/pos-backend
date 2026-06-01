@@ -23,9 +23,9 @@ from app.schemas.movimiento_caja_schema import (
 )
 from app.schemas.sucursal_schema import (
     ClienteEmpresaResponse,
-    EmpleadoSucursalResponse,
     InvitacionClienteCreate,
     InvitacionEmpleadoCreate,
+    PersonalEmpresaResponse,
     SucursalEmpleadoAsignadaResponse,
     SucursalCreate,
     SucursalResponse,
@@ -197,28 +197,26 @@ def invitar_cliente(
 
 
 @empresa_router.get(
-    "/{id_empresa}/sucursales/{id_sucursal}/empleados",
-    response_model=list[EmpleadoSucursalResponse],
+    "/{id_empresa}/personal",
+    response_model=list[PersonalEmpresaResponse],
 )
-def obtener_empleados_sucursal(
+def obtener_personal_empresa(
     id_empresa: int,
-    id_sucursal: int,
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(get_current_user),
 ):
     try:
-        return SucursalService.obtener_empleados_de_sucursal(
+        return SucursalService.obtener_personal_de_empresa(
             db=db,
             current_user=current_user,
             id_empresa=id_empresa,
-            id_sucursal=id_sucursal,
         )
     except LookupError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception:
-        raise HTTPException(status_code=500, detail="Error al obtener los empleados.")
+        raise HTTPException(status_code=500, detail="Error al obtener el personal.")
 
 
 @empresa_router.get(

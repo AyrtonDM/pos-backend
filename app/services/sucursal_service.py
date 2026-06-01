@@ -158,9 +158,10 @@ class SucursalService:
     ):
         SucursalService._validar_empresa_del_usuario(db, current_user, id_empresa)
 
-        return SucursalRepository.obtener_sucursales_por_empresa(
+        return SucursalRepository.obtener_sucursales_por_empresa_y_usuario(
             db=db,
             id_empresa=id_empresa,
+            id_usuario=current_user.id_usuario,
         )
 
     @staticmethod
@@ -548,31 +549,21 @@ class SucursalService:
         }
 
     @staticmethod
-    def obtener_empleados_de_sucursal(
+    def obtener_personal_de_empresa(
         db: Session,
         current_user: Usuario,
         id_empresa: int,
-        id_sucursal: int,
     ):
-        SucursalService.obtener_sucursal_de_empresa(
+        SucursalService._validar_empresa_del_usuario(
             db=db,
             current_user=current_user,
             id_empresa=id_empresa,
-            id_sucursal=id_sucursal,
         )
 
-        rol_empleado = EmpresaRepository.obtener_rol_por_nombre(
-            db=db,
-            nombre="EMPLEADO",
-        )
-        if rol_empleado is None:
-            raise ValueError("No existe el rol EMPLEADO.")
-
-        return EmpresaRepository.obtener_usuarios_rol_por_sucursal_y_rol(
+        return EmpresaRepository.obtener_personal_por_empresa_excluyendo_roles(
             db=db,
             id_empresa=id_empresa,
-            id_sucursal=id_sucursal,
-            id_rol=rol_empleado.id_rol,
+            roles_excluidos=["ADMINISTRADOR", "CLIENTE"],
         )
 
     @staticmethod

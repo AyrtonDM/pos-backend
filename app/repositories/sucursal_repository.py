@@ -2,6 +2,7 @@
 from sqlalchemy.orm import Session
 
 from app.models.empresas import Sucursal
+from app.models.usuarios import UsuarioRol
 
 
 class SucursalRepository:
@@ -16,6 +17,25 @@ class SucursalRepository:
     @staticmethod
     def obtener_sucursales_por_empresa(db: Session, id_empresa: int) -> list[Sucursal]:
         return db.query(Sucursal).filter(Sucursal.id_empresa == id_empresa).all()
+
+    @staticmethod
+    def obtener_sucursales_por_empresa_y_usuario(
+        db: Session,
+        id_empresa: int,
+        id_usuario: int,
+    ) -> list[Sucursal]:
+        return (
+            db.query(Sucursal)
+            .join(UsuarioRol, UsuarioRol.id_sucursal == Sucursal.id_sucursal)
+            .filter(
+                Sucursal.id_empresa == id_empresa,
+                UsuarioRol.id_empresa == id_empresa,
+                UsuarioRol.id_usuario == id_usuario,
+                UsuarioRol.activo.is_(True),
+            )
+            .distinct()
+            .all()
+        )
 
     @staticmethod
     def obtener_sucursal_por_empresa(
