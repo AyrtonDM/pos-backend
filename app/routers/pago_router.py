@@ -130,7 +130,7 @@ async def webhook_stripe(
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    except Exception:
+    except Exception as e:
         raise HTTPException(
-            status_code=500, detail="Error procesando el webhook."
+            status_code=500, detail=f"Error procesando el webhook: {str(e)}"
         )
