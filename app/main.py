@@ -36,6 +36,8 @@ from app.routers.sucursal_router import (
     sucursal_router,
 )
 from app.routers.notifications_router import router as notifications_router
+from app.routers.pago_router import router as pago_router
+from app.routers.plan_router import router as plan_router
 from app.seeds import run_seeds
 from app.services.inventario_service import InventarioService
 
@@ -69,6 +71,8 @@ app.include_router(sucursal_router)
 app.include_router(invitacion_router)
 app.include_router(notifications_router)
 app.include_router(reportes_router)
+app.include_router(pago_router)
+app.include_router(plan_router)
 
 media_root = Path(__file__).resolve().parent / "media"
 media_root.mkdir(parents=True, exist_ok=True)
