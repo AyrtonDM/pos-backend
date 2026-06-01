@@ -13,3 +13,4 @@ class Rol(Base):
     activo = Column(Boolean, default=True, nullable=False)
 
     usuario_roles = relationship("UsuarioRol", back_populates="rol")
+    roles_permisos = relationship("RolPermiso", back_populates="rol", cascade="all, delete-orphan")
