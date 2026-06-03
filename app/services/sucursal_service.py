@@ -10,6 +10,7 @@ from jose import jwt
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.core.config import obtener_app_base_url
 from app.core.security import JWT_ALGORITHM
 from app.core.security import JWT_SECRET_KEY
 from app.models.usuarios import Usuario
@@ -261,7 +262,7 @@ class SucursalService:
         if rol.id_empresa is not None and rol.id_empresa != id_empresa:
             raise ValueError("El rol no pertenece a esta empresa.")
 
-        base_url = os.getenv("APP_BASE_URL", "http://localhost:8000").rstrip("/")
+        base_url = obtener_app_base_url()
         token = SucursalService._crear_token_invitacion_empleado(
             id_empresa=id_empresa,
             id_usuario=usuario_invitado.id_usuario,
@@ -327,7 +328,7 @@ class SucursalService:
         if usuario_rol_existente is not None:
             raise ValueError("El usuario ya es cliente de esta empresa.")
 
-        base_url = os.getenv("APP_BASE_URL", "http://localhost:8000").rstrip("/")
+        base_url = obtener_app_base_url()
         invitation_link = (
             f"{base_url}/api/invitaciones/cliente/aceptar/"
             f"{id_empresa}/{usuario_invitado.id_usuario}"
