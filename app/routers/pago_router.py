@@ -20,6 +20,7 @@ from app.schemas.pago_schema import (
     ConfirmarPagoResponse,
 )
 from app.services.pago_service import PagoService
+from app.services.bitacora_service import registrar_accion
 
 router = APIRouter(prefix="/api/pagos", tags=["pagos"])
 
@@ -47,12 +48,21 @@ def crear_checkout(
     El frontend debe redirigir al usuario a checkout_url.
     """
     try:
-        return PagoService.crear_checkout_session(
+        resultado = PagoService.crear_checkout_session(
             db=db,
             current_user=current_user,
             id_empresa=datos.id_empresa,
             id_plan=datos.id_plan,
         )
+        try:
+            registrar_accion(
+                usuario_nombre=current_user.email,
+                accion=f"Registró pago ID: {resultado.session_id}, monto: {resultado.monto}",
+                empresa_nombre=str(datos.id_empresa)
+            )
+        except Exception:
+            pass
+        return resultado
     except PermissionError as e:
         raise HTTPException(status_code=403, detail=str(e))
     except LookupError as e:
@@ -81,11 +91,21 @@ def confirmar_pago(
     Idempotente: llamadas repetidas con el mismo session_id retornan el mismo resultado.
     """
     try:
-        return PagoService.confirmar_pago(
+        resultado = PagoService.confirmar_pago(
             db=db,
             current_user=current_user,
             session_id=datos.session_id,
         )
+        try:
+            empresa_id = str(resultado.suscripcion.id_empresa) if resultado and hasattr(resultado, 'suscripcion') else None
+            registrar_accion(
+                usuario_nombre=current_user.email,
+                accion=f"Confirmó pago ID: {datos.session_id}",
+                empresa_nombre=empresa_id
+            )
+        except Exception:
+            pass
+        return resultado
     except PermissionError as e:
         raise HTTPException(status_code=402, detail=str(e))
     except ValueError as e:

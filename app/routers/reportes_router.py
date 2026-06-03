@@ -28,6 +28,7 @@ from app.schemas.reporte_schema import (
     SolicitudReporte,
 )
 from app.services.reportes_service import ReportesService
+from app.services.bitacora_service import registrar_accion
 
 router = APIRouter(prefix="/api/reportes", tags=["reportes"])
 
@@ -178,12 +179,21 @@ def obtener_reporte_ventas_parametrizado(
     current_user: Usuario = Depends(get_current_user),
 ):
     try:
-        return ReportesService.obtener_reporte_ventas_parametrizado(
+        resultado = ReportesService.obtener_reporte_ventas_parametrizado(
             db=db,
             current_user=current_user,
             empresa_id=empresa_id,
             filtros=filtros,
         )
+        try:
+            registrar_accion(
+                usuario_nombre=current_user.email if current_user else "UsuarioDesconocido",
+                accion="Generó reporte de ventas",
+                empresa_nombre=str(empresa_id)
+            )
+        except Exception:
+            pass
+        return resultado
     except LookupError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except ValueError as exc:
@@ -200,12 +210,21 @@ def obtener_reporte_inventario_parametrizado(
     current_user: Usuario = Depends(get_current_user),
 ):
     try:
-        return ReportesService.obtener_reporte_inventario_parametrizado(
+        resultado = ReportesService.obtener_reporte_inventario_parametrizado(
             db=db,
             current_user=current_user,
             empresa_id=empresa_id,
             filtros=filtros,
         )
+        try:
+            registrar_accion(
+                usuario_nombre=current_user.email if current_user else "UsuarioDesconocido",
+                accion="Generó reporte de inventario",
+                empresa_nombre=str(empresa_id)
+            )
+        except Exception:
+            pass
+        return resultado
     except LookupError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except ValueError as exc:
@@ -222,12 +241,21 @@ def obtener_reporte_cajas_parametrizado(
     current_user: Usuario = Depends(get_current_user),
 ):
     try:
-        return ReportesService.obtener_reporte_cajas_parametrizado(
+        resultado = ReportesService.obtener_reporte_cajas_parametrizado(
             db=db,
             current_user=current_user,
             empresa_id=empresa_id,
             filtros=filtros,
         )
+        try:
+            registrar_accion(
+                usuario_nombre=current_user.email if current_user else "UsuarioDesconocido",
+                accion="Generó reporte de cajas",
+                empresa_nombre=str(empresa_id)
+            )
+        except Exception:
+            pass
+        return resultado
     except LookupError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except ValueError as exc:
@@ -266,14 +294,23 @@ def ejecutar_reporte(
     empresa_id: int,
     solicitud: SolicitudReporte,
     db: Session = Depends(get_db),
-    _: Usuario = Depends(get_current_user),
+    current_user: Usuario = Depends(get_current_user),
 ):
     empresa = db.query(Empresa).filter(Empresa.id_empresa == empresa_id).first()
     if not empresa:
         raise HTTPException(status_code=404, detail="La empresa no existe.")
 
     try:
-        return ReportesService.ejecutar_reporte(db=db, solicitud=solicitud, empresa_id=empresa_id)
+        resultado = ReportesService.ejecutar_reporte(db=db, solicitud=solicitud, empresa_id=empresa_id)
+        try:
+            registrar_accion(
+                usuario_nombre=current_user.email if current_user else "UsuarioDesconocido",
+                accion="Ejecutó reporte interpretado",
+                empresa_nombre=str(empresa_id)
+            )
+        except Exception:
+            pass
+        return resultado
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
