@@ -33,6 +33,7 @@ from app.schemas.sucursal_schema import (
 )
 from app.services.caja_service import CajaService, CajaSesionAbiertaError
 from app.services.sucursal_service import SucursalService
+from app.services.bitacora_service import registrar_accion
 
 empresa_router = APIRouter(prefix="/api/empresas", tags=["sucursales"])
 sucursal_router = APIRouter(prefix="/api/sucursales", tags=["sucursales"])
@@ -88,7 +89,7 @@ def crear_sucursal(
     current_user: Usuario = Depends(get_current_user),
 ):
     try:
-        return SucursalService.crear_sucursal_para_empresa(
+        resultado = SucursalService.crear_sucursal_para_empresa(
             db=db,
             current_user=current_user,
             id_empresa=id_empresa,
@@ -97,6 +98,16 @@ def crear_sucursal(
             telefono=datos.telefono,
             ciudad=datos.ciudad,
         )
+        try:
+            usuario_nombre = getattr(current_user.persona, 'nombre_completo', None) if getattr(current_user, 'persona', None) else getattr(current_user, 'email', 'UsuarioDesconocido')
+            registrar_accion(
+                usuario_nombre=usuario_nombre,
+                accion=f"Registró la sucursal: {datos.nombre}"
+            )
+        except Exception:
+            pass
+        return resultado
+
     except LookupError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except ValueError as e:
@@ -492,7 +503,7 @@ def actualizar_sucursal(
     current_user: Usuario = Depends(get_current_user),
 ):
     try:
-        return SucursalService.actualizar_sucursal_del_usuario(
+        resultado = SucursalService.actualizar_sucursal_del_usuario(
             db=db,
             current_user=current_user,
             id_sucursal=id_sucursal,
@@ -502,6 +513,16 @@ def actualizar_sucursal(
             ciudad=datos.ciudad,
             activo=datos.activo,
         )
+        try:
+            usuario_nombre = getattr(current_user.persona, 'nombre_completo', None) if getattr(current_user, 'persona', None) else getattr(current_user, 'email', 'UsuarioDesconocido')
+            registrar_accion(
+                usuario_nombre=usuario_nombre,
+                accion=f"Editó la sucursal ID: {id_sucursal}"
+            )
+        except Exception:
+            pass
+        return resultado
+        
     except LookupError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except ValueError as e:

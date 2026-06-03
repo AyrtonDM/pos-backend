@@ -24,6 +24,7 @@ from app.services.cliente_service import ClienteService
 from app.services.empresa_service import EmpresaService
 from app.services.producto_service import ProductoService
 from app.utils.product_image_storage import save_product_image
+from app.services.bitacora_service import registrar_accion
 from fastapi import File, Form, UploadFile
 from decimal import Decimal
 
@@ -101,7 +102,7 @@ def actualizar_empresa(
     current_user: Usuario = Depends(get_current_user),
 ):
     try:
-        return EmpresaService.actualizar_empresa_del_usuario(
+        resultado = EmpresaService.actualizar_empresa_del_usuario(
             db=db,
             current_user=current_user,
             id_empresa=id_empresa,
@@ -111,6 +112,17 @@ def actualizar_empresa(
             correo=datos.correo,
             activo=datos.activo,
         )
+        #bitacora
+        try:
+            usuario_nombre = getattr(current_user.persona, 'nombre_completo', None) if getattr(current_user, 'persona', None) else getattr(current_user, 'email', 'UsuarioDesconocido')
+            registrar_accion(
+                usuario_nombre=usuario_nombre,
+                accion=f"Editó la empresa ID: {id_empresa}"
+            )
+        except Exception:
+            pass
+        return resultado
+        #
     except LookupError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except ValueError as e:
@@ -126,7 +138,7 @@ def crear_empresa(
     current_user: Usuario = Depends(get_current_user),
 ):
     try:
-        return EmpresaService.crear_empresa_para_usuario(
+        resultado = EmpresaService.crear_empresa_para_usuario(
             db=db,
             current_user=current_user,
             nombre=datos.nombre,
@@ -134,6 +146,18 @@ def crear_empresa(
             nit=datos.nit,
             correo=datos.correo,
         )
+        #bitacora
+        try:
+            usuario_nombre = getattr(current_user.persona,
+             'nombre_completo', None) if getattr(current_user, 'persona', None) else getattr(current_user, 'email', 'UsuarioDesconocido')
+            registrar_accion(
+                usuario_nombre=usuario_nombre,
+                accion=f"Registró la empresa: {datos.nombre}"
+            )
+        except Exception:
+            pass
+        return resultado
+        #
     except PermissionError as e:
         raise HTTPException(status_code=403, detail=str(e))
     except ValueError as e:

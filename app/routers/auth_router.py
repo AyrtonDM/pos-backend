@@ -11,6 +11,7 @@ from app.schemas.usuario_schema import (
     UsuarioVerifyCode,
 )
 from app.services.usuario_service import UsuarioService
+from app.services.bitacora_service import registrar_accion
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -58,6 +59,15 @@ def registrar_usuario(
             telefono=datos.telefono,
             documento=datos.documento,
         )
+        # Registrar en bitácora
+        try:
+            registrar_accion(
+                usuario_nombre=datos.nombre_completo,
+                accion="Se registró el usuario"
+            )
+        except Exception:
+            # Si falla la bitácora, no afectar el registro
+            pass
         return resultado
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -85,6 +95,15 @@ def login_usuario(
             email=datos.email,
             contrasena=datos.contrasena,
         )
+         # Registrar en bitácora
+        try:
+            registrar_accion(
+                usuario_nombre=datos.email,
+                accion="Inició sesión"
+            )
+        except Exception:
+            # Si falla la bitácora, no afectar el login
+            pass
         return resultado
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
