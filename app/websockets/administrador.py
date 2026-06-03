@@ -56,6 +56,18 @@ def _firma_dashboard(dashboard: dict[str, Any]) -> str:
     return json.dumps(comparable, sort_keys=True, ensure_ascii=False)
 
 
+def _calcular_dashboard(id_empresa: int, id_sucursal: int | None = None) -> dict[str, Any]:
+    db = SessionLocal()
+    try:
+        return _obtener_dashboard(
+            db=db,
+            id_empresa=id_empresa,
+            id_sucursal=id_sucursal,
+        )
+    finally:
+        db.close()
+
+
 def _base_sucursales(db: Session, id_empresa: int, id_sucursal: int | None = None):
     query = db.query(Sucursal).filter(Sucursal.id_empresa == id_empresa)
     if id_sucursal is not None:
@@ -255,10 +267,9 @@ def _obtener_dashboard(db: Session, id_empresa: int, id_sucursal: int | None = N
 @router.websocket("/{id_empresa}")
 async def administrador_dashboard(websocket: WebSocket, id_empresa: int):
     await websocket.accept()
-    db = SessionLocal()
     try:
         id_sucursal_actual: int | None = None
-        dashboard = _obtener_dashboard(db=db, id_empresa=id_empresa)
+        dashboard = _calcular_dashboard(id_empresa=id_empresa)
         firma_dashboard = _firma_dashboard(dashboard)
         await websocket.send_json({"tipo": "dashboard", "datos": [dashboard]})
 
@@ -271,8 +282,7 @@ async def administrador_dashboard(websocket: WebSocket, id_empresa: int):
                 tipo = mensaje.get("tipo")
                 if tipo == "dashboard":
                     id_sucursal_actual = _extraer_id_sucursal(mensaje)
-                    dashboard = _obtener_dashboard(
-                        db=db,
+                    dashboard = _calcular_dashboard(
                         id_empresa=id_empresa,
                         id_sucursal=id_sucursal_actual,
                     )
@@ -286,9 +296,7 @@ async def administrador_dashboard(websocket: WebSocket, id_empresa: int):
                         }
                     )
             except asyncio.TimeoutError:
-                db.expire_all()
-                dashboard = _obtener_dashboard(
-                    db=db,
+                dashboard = _calcular_dashboard(
                     id_empresa=id_empresa,
                     id_sucursal=id_sucursal_actual,
                 )
@@ -298,5 +306,3 @@ async def administrador_dashboard(websocket: WebSocket, id_empresa: int):
                     await websocket.send_json({"tipo": "dashboard", "datos": [dashboard]})
     except WebSocketDisconnect:
         pass
-    finally:
-        db.close()
