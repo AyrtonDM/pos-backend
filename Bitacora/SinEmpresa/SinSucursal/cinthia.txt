@@ -1,0 +1,2 @@
+[03-Jun-2026 15:58:39] Registró la sucursal: suc1
+[03-Jun-2026 16:06:15] Registró la empresa: CARMIN

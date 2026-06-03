@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from app.core.database import SessionLocal
 from app.core.security import get_current_user
 from app.models.usuarios import Usuario
+from app.models.empresas import Empresa
 from app.schemas.caja_schema import (
     CajaCierreDetalleCreate,
     CajaSesionCierreResponse,
@@ -102,9 +103,16 @@ def crear_sucursal(
         )
         try:
             usuario_nombre = getattr(current_user.persona, 'nombre_completo', None) if getattr(current_user, 'persona', None) else getattr(current_user, 'email', 'UsuarioDesconocido')
+            
+            empresa = db.query(Empresa).filter(Empresa.id_empresa == id_empresa).first()
+            empresa_nombre = empresa.nombre if empresa else None
+            sucursal_nombre = resultado.nombre if resultado and hasattr(resultado, 'nombre') else datos.nombre
+
             registrar_accion(
                 usuario_nombre=usuario_nombre,
-                accion=f"Registró la sucursal: {datos.nombre}"
+                empresa_nombre=empresa_nombre,
+                sucursal_nombre=sucursal_nombre,
+                accion=f"Registró la sucursal: {sucursal_nombre}"
             )
         except Exception:
             pass
