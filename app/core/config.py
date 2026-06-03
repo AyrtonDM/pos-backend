@@ -9,6 +9,9 @@ load_dotenv()
 
 BASE_DIR = Path(__file__).resolve().parents[1]
 
+DEVELOPMENT_APP_BASE_URL = "http://localhost:8000"
+PRODUCTION_APP_BASE_URL = "https://pos-backend-app.duckdns.org"
+
 
 def obtener_modelo_reportes() -> str:
 	return os.getenv("OPENAI_REPORT_MODEL", "gpt-5.4-mini")
@@ -16,6 +19,21 @@ def obtener_modelo_reportes() -> str:
 
 def obtener_clave_openai() -> str | None:
 	return os.getenv("OPENAI_API_KEY")
+
+
+def obtener_app_env() -> str:
+    return os.getenv("APP_ENV", "development").strip().lower()
+
+
+def obtener_app_base_url() -> str:
+    app_base_url = os.getenv("APP_BASE_URL", "").strip()
+    if app_base_url:
+        return app_base_url.rstrip("/")
+
+    if obtener_app_env() in {"production", "prod"}:
+        return PRODUCTION_APP_BASE_URL
+
+    return DEVELOPMENT_APP_BASE_URL
 
 
 # ---------------------------------------------------------------------------
