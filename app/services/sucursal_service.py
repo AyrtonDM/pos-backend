@@ -24,6 +24,8 @@ from app.utils.email_service import (
     send_employee_invitation_email,
 )
 
+DEFAULT_APP_BASE_URL = "https://pos-backend-app.duckdns.org"
+
 
 class SucursalService:
     @staticmethod
@@ -261,7 +263,7 @@ class SucursalService:
         if rol.id_empresa is not None and rol.id_empresa != id_empresa:
             raise ValueError("El rol no pertenece a esta empresa.")
 
-        base_url = os.getenv("APP_BASE_URL", "http://localhost:8000").rstrip("/")
+        base_url = os.getenv("APP_BASE_URL", DEFAULT_APP_BASE_URL).rstrip("/")
         token = SucursalService._crear_token_invitacion_empleado(
             id_empresa=id_empresa,
             id_usuario=usuario_invitado.id_usuario,
@@ -327,7 +329,7 @@ class SucursalService:
         if usuario_rol_existente is not None:
             raise ValueError("El usuario ya es cliente de esta empresa.")
 
-        base_url = os.getenv("APP_BASE_URL", "http://localhost:8000").rstrip("/")
+        base_url = os.getenv("APP_BASE_URL", DEFAULT_APP_BASE_URL).rstrip("/")
         invitation_link = (
             f"{base_url}/api/invitaciones/cliente/aceptar/"
             f"{id_empresa}/{usuario_invitado.id_usuario}"

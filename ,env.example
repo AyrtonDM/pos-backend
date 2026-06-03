@@ -12,6 +12,7 @@ JWT_EXPIRATION_HOURS=24
 # Email verification settings
 VERIFICATION_CODE_EXPIRATION_MINUTES=15
 VERIFICATION_CODE_MAX_ATTEMPTS=3
+APP_BASE_URL=https://pos-backend-app.duckdns.org
 
 # SMTP settings
 SMTP_HOST=smtp.gmail.com
