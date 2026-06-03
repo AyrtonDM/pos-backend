@@ -20,7 +20,7 @@ from app.models.inventario import Stock
 from app.models.inventario.movimiento_inventario import MovimientoInventario
 from app.models.inventario.tipo_movimiento import TipoMovimiento
 from app.models.productos import CategoriaProducto, Producto, SubcategoriaProducto
-from app.models.ventas import DetalleVenta, MetodoPago, Venta, VentaPago
+from app.models.ventas import DetalleVenta, MetodoPago, TipoVenta, Venta, VentaPago
 from app.models.clientes.cliente import Cliente
 from app.models.usuarios.usuario import Usuario
 from app.models.usuarios.persona import Persona
@@ -33,6 +33,8 @@ from app.schemas.reporte_schema import (
     MovimientosCajaEmpresaResponse,
     MovimientosInventarioEmpresaResponse,
     PlantillaReporte,
+    ReporteVentasParametrizadoRequest,
+    ReporteVentasParametrizadoResponse,
     ResumenCajasEmpresaResponse,
     ResumenVentasEmpresaResponse,
     RespuestaReporte,
@@ -1107,6 +1109,153 @@ class ReportesService:
                 "total_ingresos": round(total_ingresos_empresa, 2),
                 "total_egresos": round(total_egresos_empresa, 2),
             },
+        )
+
+    @staticmethod
+    def obtener_reporte_ventas_parametrizado(
+        db: Session,
+        current_user: Usuario,
+        empresa_id: int,
+        filtros: ReporteVentasParametrizadoRequest,
+    ) -> ReporteVentasParametrizadoResponse:
+        if current_user is None or not current_user.activo:
+            raise ValueError("Usuario no autorizado o inactivo.")
+        if filtros.fecha_final < filtros.fecha_inicial:
+            raise ValueError("La fecha final no puede ser menor que la fecha inicial.")
+
+        empresa = EmpresaRepository.obtener_empresa_por_usuario(
+            db=db,
+            id_usuario=current_user.id_usuario,
+            id_empresa=empresa_id,
+        )
+        if empresa is None:
+            raise LookupError("Empresa no encontrada para este usuario.")
+
+        inicio = datetime.combine(filtros.fecha_inicial, time.min)
+        fin = datetime.combine(filtros.fecha_final, time.max)
+
+        productos_por_venta = (
+            db.query(
+                DetalleVenta.id_venta.label("id_venta"),
+                func.coalesce(func.sum(DetalleVenta.cantidad), 0).label("productos"),
+            )
+            .group_by(DetalleVenta.id_venta)
+            .subquery()
+        )
+
+        consulta = (
+            db.query(
+                Venta.id_venta.label("id_venta"),
+                Venta.fecha.label("fecha"),
+                Persona.nombre_completo.label("personal"),
+                TipoVenta.nombre.label("tipo_venta"),
+                MetodoPago.nombre.label("metodo_pago"),
+                func.coalesce(productos_por_venta.c.productos, 0).label("productos"),
+                func.coalesce(Venta.total, 0).label("total"),
+            )
+            .join(CajaSesion, Venta.id_caja_sesion == CajaSesion.id_caja_sesion)
+            .join(Caja, CajaSesion.id_caja == Caja.id_caja)
+            .join(Sucursal, Caja.id_sucursal == Sucursal.id_sucursal)
+            .join(TipoVenta, Venta.id_tipo_venta == TipoVenta.id_tipo_venta)
+            .join(Usuario, Venta.id_usuario == Usuario.id_usuario)
+            .join(Persona, Usuario.id_persona == Persona.id_persona)
+            .outerjoin(VentaPago, Venta.id_venta == VentaPago.id_venta)
+            .outerjoin(MetodoPago, VentaPago.id_metodo_pago == MetodoPago.id_metodo_pago)
+            .outerjoin(productos_por_venta, Venta.id_venta == productos_por_venta.c.id_venta)
+            .filter(Sucursal.id_empresa == empresa_id)
+            .filter(Venta.fecha.between(inicio, fin))
+            .filter(Venta.estado != "ANULADA")
+        )
+
+        if filtros.id_sucursal is not None:
+            consulta = consulta.filter(Sucursal.id_sucursal == filtros.id_sucursal)
+        if filtros.id_tipo_venta is not None:
+            consulta = consulta.filter(Venta.id_tipo_venta == filtros.id_tipo_venta)
+        if filtros.id_metodo_pago is not None:
+            consulta = consulta.filter(VentaPago.id_metodo_pago == filtros.id_metodo_pago)
+        if filtros.id_usuario is not None:
+            consulta = consulta.filter(Venta.id_usuario == filtros.id_usuario)
+        if filtros.id_producto is not None:
+            ventas_con_producto = (
+                db.query(DetalleVenta.id_venta)
+                .filter(DetalleVenta.id_producto == filtros.id_producto)
+                .subquery()
+            )
+            consulta = consulta.filter(Venta.id_venta.in_(ventas_con_producto))
+
+        filas = consulta.order_by(Venta.fecha.desc(), Venta.id_venta.desc()).all()
+
+        detalle_analitico = [
+            {
+                "id_venta": int(fila.id_venta),
+                "numero_venta": f"V-{int(fila.id_venta):06d}",
+                "fecha_hora": fila.fecha.strftime("%d/%m/%Y %H:%M") if fila.fecha else "",
+                "personal": fila.personal,
+                "tipo": fila.tipo_venta,
+                "metodo_pago": fila.metodo_pago,
+                "productos": int(fila.productos or 0),
+                "total": float(fila.total or 0),
+            }
+            for fila in filas
+        ]
+
+        total_ventas = len(detalle_analitico)
+        monto_total = round(sum(fila["total"] for fila in detalle_analitico), 2)
+        productos_vendidos = sum(fila["productos"] for fila in detalle_analitico)
+
+        def _nombre_sucursal() -> str:
+            if filtros.id_sucursal is None:
+                return "Todas"
+            sucursal = db.query(Sucursal).filter(Sucursal.id_sucursal == filtros.id_sucursal).first()
+            return sucursal.nombre if sucursal else f"Sucursal {filtros.id_sucursal}"
+
+        def _nombre_tipo_venta() -> str:
+            if filtros.id_tipo_venta is None:
+                return "Todas"
+            tipo_venta = db.query(TipoVenta).filter(TipoVenta.id_tipo_venta == filtros.id_tipo_venta).first()
+            return tipo_venta.nombre if tipo_venta else f"Tipo venta {filtros.id_tipo_venta}"
+
+        def _nombre_metodo_pago() -> str:
+            if filtros.id_metodo_pago is None:
+                return "Todos"
+            metodo_pago = db.query(MetodoPago).filter(MetodoPago.id_metodo_pago == filtros.id_metodo_pago).first()
+            return metodo_pago.nombre if metodo_pago else f"Metodo pago {filtros.id_metodo_pago}"
+
+        def _nombre_producto() -> str:
+            if filtros.id_producto is None:
+                return "Todos"
+            producto = db.query(Producto).filter(Producto.id_producto == filtros.id_producto).first()
+            return producto.nombre if producto else f"Producto {filtros.id_producto}"
+
+        def _nombre_personal() -> str:
+            if filtros.id_usuario is None:
+                return "Todos"
+            usuario = (
+                db.query(Usuario)
+                .join(Persona, Usuario.id_persona == Persona.id_persona)
+                .filter(Usuario.id_usuario == filtros.id_usuario)
+                .first()
+            )
+            return usuario.persona.nombre_completo if usuario and usuario.persona else f"Usuario {filtros.id_usuario}"
+
+        return ReporteVentasParametrizadoResponse(
+            id_empresa=empresa_id,
+            empresa=empresa.nombre,
+            fecha_generacion=datetime.utcnow().strftime("%d/%m/%Y - %H:%M"),
+            filtros_aplicados={
+                "periodo": f"{filtros.fecha_inicial.strftime('%d/%m/%Y')} al {filtros.fecha_final.strftime('%d/%m/%Y')}",
+                "sucursal": _nombre_sucursal(),
+                "tipo_venta": _nombre_tipo_venta(),
+                "metodo_pago": _nombre_metodo_pago(),
+                "producto": _nombre_producto(),
+                "personal": _nombre_personal(),
+            },
+            resumen_gerencial=[
+                {"indicador": "Total de ventas realizadas", "valor": total_ventas},
+                {"indicador": "Monto total vendido", "valor": monto_total},
+                {"indicador": "Productos vendidos", "valor": productos_vendidos},
+            ],
+            detalle_analitico=detalle_analitico,
         )
 
     @staticmethod

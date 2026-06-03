@@ -279,3 +279,47 @@ class MovimientosCajaEmpresaResponse(BaseModel):
     fecha: date
     sucursales: list[SucursalMovimientosCaja]
     total_empresa: TotalEmpresaMovimientosCaja
+
+
+class ReporteVentasParametrizadoRequest(BaseModel):
+    fecha_inicial: date
+    fecha_final: date
+    id_sucursal: int | None = None
+    id_tipo_venta: int | None = None
+    id_metodo_pago: int | None = None
+    id_producto: int | None = None
+    id_usuario: int | None = None
+
+
+class FiltrosAplicadosVentasResponse(BaseModel):
+    periodo: str
+    sucursal: str
+    tipo_venta: str
+    metodo_pago: str
+    producto: str
+    personal: str
+
+
+class IndicadorReporteVentas(BaseModel):
+    indicador: str
+    valor: int | float
+
+
+class DetalleAnaliticoVenta(BaseModel):
+    id_venta: int
+    numero_venta: str
+    fecha_hora: str
+    personal: str | None
+    tipo: str | None
+    metodo_pago: str | None
+    productos: int
+    total: float
+
+
+class ReporteVentasParametrizadoResponse(BaseModel):
+    id_empresa: int
+    empresa: str
+    fecha_generacion: str
+    filtros_aplicados: FiltrosAplicadosVentasResponse
+    resumen_gerencial: list[IndicadorReporteVentas]
+    detalle_analitico: list[DetalleAnaliticoVenta]
