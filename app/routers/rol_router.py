@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from app.core.database import SessionLocal
 from app.schemas.rol_schema import RolCreateRequest, RolCreateResponse, RolDetalleResponse, RolResponse, RolUpdateRequest
 from app.services.rol_service import RolService
+from app.services.bitacora_service import registrar_accion
 
 router = APIRouter(prefix="/api/roles", tags=["roles"])
 
@@ -47,12 +48,21 @@ def editar_rol(
     db: Session = Depends(get_db),
 ):
     try:
-        return RolService.editar_rol(
+        resultado = RolService.editar_rol(
             db=db,
             id_rol=id_rol,
             activo=payload.activo,
             permiso_ids=payload.permiso_ids,
         )
+        try:
+            registrar_accion(
+                usuario_nombre="UsuarioDesconocido",
+                accion=f"Editó rol ID: {id_rol}",
+                empresa_nombre=str(resultado.id_empresa) if resultado and hasattr(resultado, 'id_empresa') else None
+            )
+        except Exception:
+            pass
+        return resultado
     except LookupError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except ValueError as e:
@@ -68,12 +78,21 @@ def crear_rol(
     db: Session = Depends(get_db),
 ):
     try:
-        return RolService.crear_rol_con_permisos(
+        resultado = RolService.crear_rol_con_permisos(
             db=db,
             id_empresa=id_empresa,
             nombre=payload.nombre,
             permiso_ids=payload.permiso_ids,
         )
+        try:
+            registrar_accion(
+                usuario_nombre="UsuarioDesconocido",
+                accion=f"Registró rol: {payload.nombre}",
+                empresa_nombre=str(id_empresa)
+            )
+        except Exception:
+            pass
+        return resultado
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception:

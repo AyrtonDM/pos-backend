@@ -20,6 +20,7 @@ from app.schemas.producto_schema import (
     SubcategoriaProductoUpdate,
 )
 from app.services.producto_service import ProductoService
+from app.services.bitacora_service import registrar_accion
 from app.utils.product_image_storage import save_product_image
 
 router = APIRouter(prefix="/api/productos", tags=["productos"])
@@ -172,7 +173,15 @@ def actualizar_producto(
     current_user: Usuario = Depends(get_current_user),
 ):
     try:
-        return ProductoService.actualizar_producto(db=db, current_user=current_user, id_producto=id_producto, payload=datos)
+        resultado = ProductoService.actualizar_producto(db=db, current_user=current_user, id_producto=id_producto, payload=datos)
+        try:
+            registrar_accion(
+                usuario_nombre=current_user.email,
+                accion=f"Editó el producto ID: {id_producto}"
+            )
+        except Exception:
+            pass
+        return resultado
     except LookupError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except ValueError as e:
@@ -208,6 +217,13 @@ def actualizar_imagen_producto(
 def eliminar_producto(id_producto: int, db: Session = Depends(get_db), current_user: Usuario = Depends(get_current_user)):
     try:
         ProductoService.eliminar_producto(db=db, current_user=current_user, id_producto=id_producto)
+        try:
+            registrar_accion(
+                usuario_nombre=current_user.email,
+                accion=f"Eliminó el producto ID: {id_producto}"
+            )
+        except Exception:
+            pass
         return {"mensaje": "Producto eliminado correctamente."}
     except LookupError as e:
         raise HTTPException(status_code=404, detail=str(e))
