@@ -17,9 +17,9 @@ def _find_service_account_in_secrets() -> Optional[str]:
             return str(p)
     return None
 
-def get_messaging_client() -> Optional[messaging]:
+#def get_messaging_client() -> Optional[messaging]:
 
-#def get_messaging_client() -> Optional[Any]:
+def get_messaging_client() -> Optional[Any]:
     global _app
     if _app is None:
         cred_path = os.getenv("FIREBASE_SERVICE_ACCOUNT")
