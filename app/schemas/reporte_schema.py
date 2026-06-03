@@ -323,3 +323,85 @@ class ReporteVentasParametrizadoResponse(BaseModel):
     filtros_aplicados: FiltrosAplicadosVentasResponse
     resumen_gerencial: list[IndicadorReporteVentas]
     detalle_analitico: list[DetalleAnaliticoVenta]
+
+
+class ReporteInventarioParametrizadoRequest(BaseModel):
+    fecha_inicial: date
+    fecha_final: date
+    id_sucursal: int | None = None
+    id_tipo_movimiento: int | None = None
+    id_producto: int | None = None
+    id_categoria_producto: int | None = None
+
+
+class FiltrosAplicadosInventarioResponse(BaseModel):
+    periodo: str
+    sucursal: str
+    tipo_movimiento: str
+    producto: str
+    categoria: str
+
+
+class IndicadorReporteInventario(BaseModel):
+    indicador: str
+    valor: int | float
+
+
+class DetalleAnaliticoInventario(BaseModel):
+    id_movimiento_inventario: int
+    numero_movimiento: str
+    fecha_hora: str
+    producto: str
+    categoria: str | None
+    tipo: str
+    cantidad: int
+
+
+class ReporteInventarioParametrizadoResponse(BaseModel):
+    id_empresa: int
+    empresa: str
+    fecha_generacion: str
+    filtros_aplicados: FiltrosAplicadosInventarioResponse
+    resumen_gerencial: list[IndicadorReporteInventario]
+    detalle_analitico: list[DetalleAnaliticoInventario]
+
+
+class ReporteCajasParametrizadoRequest(BaseModel):
+    fecha_inicial: date
+    fecha_final: date
+    id_sucursal: int | None = None
+    id_caja: int | None = None
+    id_tipo_movimiento_caja: int | None = None
+    estado_sesion: str | None = None
+
+
+class FiltrosAplicadosCajasResponse(BaseModel):
+    periodo: str
+    sucursal: str
+    caja: str
+    tipo_movimiento: str
+    estado_sesion: str
+
+
+class IndicadorReporteCajas(BaseModel):
+    indicador: str
+    valor: int | float
+
+
+class DetalleAnaliticoCaja(BaseModel):
+    id_movimiento_caja: int
+    numero_movimiento: str
+    fecha_hora: str
+    caja: str
+    tipo: str
+    concepto: str | None
+    monto: float
+
+
+class ReporteCajasParametrizadoResponse(BaseModel):
+    id_empresa: int
+    empresa: str
+    fecha_generacion: str
+    filtros_aplicados: FiltrosAplicadosCajasResponse
+    resumen_gerencial: list[IndicadorReporteCajas]
+    detalle_analitico: list[DetalleAnaliticoCaja]
