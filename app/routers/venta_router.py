@@ -55,14 +55,11 @@ def crear_venta(id_caja_sesion: int, datos: VentaCreate, db: Session = Depends(g
     
     # Registrar en bitácora
     try:
-        # Extraer IDs de productos de los detalles de venta
-        ids_productos = [str(d.id_producto) for d in datos.detalle_venta]
-        ids_str = ", ".join(ids_productos)
-        usuario_nombre = current_user.persona.nombre_completo if current_user.persona else current_user.email
-        
+        usuario_nombre = getattr(current_user.persona, 'nombre_completo', None) if getattr(current_user, 'persona', None) else getattr(current_user, 'email', 'UsuarioDesconocido')
+        venta_obj = resultado["venta"]
         registrar_accion(
             usuario_nombre=usuario_nombre,
-            accion=f"Registró una venta con productos id: {ids_str}"
+            accion=f"Registró venta ID: {venta_obj.id_venta}, total: {venta_obj.total}"
         )
     except Exception:
         # Si falla la bitácora, no afectar la venta
@@ -75,6 +72,14 @@ def crear_venta(id_caja_sesion: int, datos: VentaCreate, db: Session = Depends(g
 def historial_ventas(id_caja_sesion: int, db: Session = Depends(get_db), current_user: Usuario = Depends(get_current_user)):
     try:
         ventas = VentaService.obtener_historial_por_caja_sesion(db=db, current_user=current_user, id_caja_sesion=id_caja_sesion)
+        try:
+            usuario_nombre = getattr(current_user.persona, 'nombre_completo', None) if getattr(current_user, 'persona', None) else getattr(current_user, 'email', 'UsuarioDesconocido')
+            registrar_accion(
+                usuario_nombre=usuario_nombre,
+                accion="Ingresó al módulo de ventas"
+            )
+        except Exception:
+            pass
         return ventas
     except HTTPException:
         raise

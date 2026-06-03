@@ -14,6 +14,7 @@ from app.schemas.inventario_schema import (
 )
 from app.schemas.inventario_schema import MovimientoListResponse
 from app.services.inventario_service import InventarioService
+from app.services.bitacora_service import registrar_accion
 
 router = APIRouter(prefix="/api/inventario", tags=["inventario"])
 
@@ -60,13 +61,28 @@ def crear_movimiento(
         str(datos),
     )
     try:
-        return InventarioService.crear_movimiento(
+        resultado = InventarioService.crear_movimiento(
             db=db,
             current_user=current_user,
             id_empresa=id_empresa,
             id_sucursal=id_sucursal,
             payload=datos,
         )
+        try:
+            usuario_nombre = getattr(current_user.persona, 'nombre_completo', None) if getattr(current_user, 'persona', None) else getattr(current_user, 'email', 'UsuarioDesconocido')
+            if hasattr(resultado, 'tipo_movimiento') and resultado.tipo_movimiento:
+                direccion = getattr(resultado.tipo_movimiento, 'direccion', '').upper()
+                accion_str = None
+                if direccion == "ENTRADA":
+                    accion_str = f"Registró entrada de inventario producto ID: {resultado.id_producto}, cantidad: {resultado.cantidad}"
+                elif direccion == "SALIDA":
+                    accion_str = f"Registró salida de inventario producto ID: {resultado.id_producto}, cantidad: {resultado.cantidad}"
+                
+                if accion_str:
+                    registrar_accion(usuario_nombre=usuario_nombre, accion=accion_str)
+        except Exception:
+            pass
+        return resultado
     except LookupError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except ValueError as e:
@@ -143,7 +159,7 @@ def actualizar_stock_producto(
     current_user: Usuario = Depends(get_current_user),
 ):
     try:
-        return InventarioService.actualizar_stock_producto(
+        resultado = InventarioService.actualizar_stock_producto(
             db=db,
             current_user=current_user,
             id_empresa=id_empresa,
@@ -151,6 +167,15 @@ def actualizar_stock_producto(
             id_producto=id_producto,
             payload=datos,
         )
+        try:
+            usuario_nombre = getattr(current_user.persona, 'nombre_completo', None) if getattr(current_user, 'persona', None) else getattr(current_user, 'email', 'UsuarioDesconocido')
+            registrar_accion(
+                usuario_nombre=usuario_nombre,
+                accion=f"Ajustó stock producto ID: {id_producto}, cantidad: {resultado.cantidad}"
+            )
+        except Exception:
+            pass
+        return resultado
     except LookupError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except ValueError as e:

@@ -14,6 +14,7 @@ from app.schemas.cliente_schema import (
     ClienteUpdate,
 )
 from app.services.cliente_service import ClienteService
+from app.services.bitacora_service import registrar_accion
 
 cliente_router = APIRouter(prefix="/api/clientes", tags=["clientes"])
 categoria_cliente_router = APIRouter(prefix="/api/categorias-cliente", tags=["categorias-cliente"])
@@ -132,7 +133,7 @@ def create_client(
     current_user: Usuario = Depends(get_current_user),
 ):
     try:
-        return ClienteService.crear_cliente(
+        resultado = ClienteService.crear_cliente(
             db=db,
             current_user=current_user,
             id_usuario=id_usuario,
@@ -141,6 +142,15 @@ def create_client(
             saldo_credito=datos.saldo_credito,
             limite_credito=datos.limite_credito,
         )
+        try:
+            usuario_nombre = getattr(current_user.persona, 'nombre_completo', None) if getattr(current_user, 'persona', None) else getattr(current_user, 'email', 'UsuarioDesconocido')
+            registrar_accion(
+                usuario_nombre=usuario_nombre,
+                accion=f"Registró el cliente ID: {resultado.id_cliente}"
+            )
+        except Exception:
+            pass
+        return resultado
     except LookupError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except ValueError as e:
@@ -200,7 +210,7 @@ def update_client(
     current_user: Usuario = Depends(get_current_user),
 ):
     try:
-        return ClienteService.actualizar_cliente(
+        resultado = ClienteService.actualizar_cliente(
             db=db,
             current_user=current_user,
             id_usuario=id_usuario,
@@ -211,6 +221,15 @@ def update_client(
             limite_credito=datos.limite_credito,
             activo=datos.activo,
         )
+        try:
+            usuario_nombre = getattr(current_user.persona, 'nombre_completo', None) if getattr(current_user, 'persona', None) else getattr(current_user, 'email', 'UsuarioDesconocido')
+            registrar_accion(
+                usuario_nombre=usuario_nombre,
+                accion=f"Editó el cliente ID: {id_cliente}"
+            )
+        except Exception:
+            pass
+        return resultado
     except LookupError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except ValueError as e:
