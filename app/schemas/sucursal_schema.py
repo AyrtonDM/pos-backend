@@ -26,6 +26,13 @@ class InvitacionEmpleadoCreate(BaseModel):
     id_rol: PositiveInt
 
 
+class EditarPersonalCreate(BaseModel):
+    email: EmailStr
+    id_sucursales: list[PositiveInt] = Field(..., min_length=1)
+    id_rol: PositiveInt
+    activo: bool
+
+
 class InvitacionClienteCreate(BaseModel):
     email: EmailStr
 
@@ -76,6 +83,20 @@ class PersonalEmpresaResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class PersonalRelacionResponse(BaseModel):
+    id_usuario_rol: int
+    id_rol: int
+    id_empresa: int
+    id_sucursal: int | None
+    activo: bool
+
+
+class PersonalEmpresaAgrupadoResponse(BaseModel):
+    id_usuario: int
+    usuario: UsuarioEmpleadoResponse
+    relaciones: list[PersonalRelacionResponse]
 
 
 class ClienteEmpresaResponse(BaseModel):

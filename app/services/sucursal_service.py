@@ -560,11 +560,160 @@ class SucursalService:
             id_empresa=id_empresa,
         )
 
-        return EmpresaRepository.obtener_personal_por_empresa_excluyendo_roles(
+        usuarios_rol = EmpresaRepository.obtener_personal_por_empresa_excluyendo_roles(
             db=db,
             id_empresa=id_empresa,
             roles_excluidos=["ADMINISTRADOR", "CLIENTE"],
         )
+
+        personal_por_usuario = {}
+        for usuario_rol in usuarios_rol:
+            if usuario_rol.id_usuario not in personal_por_usuario:
+                personal_por_usuario[usuario_rol.id_usuario] = {
+                    "id_usuario": usuario_rol.id_usuario,
+                    "usuario": usuario_rol.usuario,
+                    "relaciones": [],
+                }
+
+            personal_por_usuario[usuario_rol.id_usuario]["relaciones"].append(
+                {
+                    "id_usuario_rol": usuario_rol.id_usuario_rol,
+                    "id_rol": usuario_rol.id_rol,
+                    "id_empresa": usuario_rol.id_empresa,
+                    "id_sucursal": usuario_rol.id_sucursal,
+                    "activo": usuario_rol.activo,
+                }
+            )
+
+        return list(personal_por_usuario.values())
+
+    @staticmethod
+    def editar_personal_de_empresa(
+        db: Session,
+        current_user: Usuario,
+        id_empresa: int,
+        email: str,
+        id_sucursales: list[int],
+        id_rol: int,
+        activo: bool,
+    ):
+        SucursalService._validar_empresa_del_usuario(
+            db=db,
+            current_user=current_user,
+            id_empresa=id_empresa,
+        )
+
+        id_sucursales_unicas = list(dict.fromkeys(id_sucursales))
+        if len(id_sucursales_unicas) != len(id_sucursales):
+            raise ValueError("No se permiten sucursales repetidas.")
+
+        sucursales_encontradas = []
+        for id_sucursal in id_sucursales_unicas:
+            sucursal = SucursalRepository.obtener_sucursal_por_empresa(
+                db=db,
+                id_empresa=id_empresa,
+                id_sucursal=id_sucursal,
+            )
+            if sucursal is None:
+                raise LookupError("Sucursal no encontrada para esta empresa.")
+            sucursales_encontradas.append(sucursal)
+
+        usuario = UsuarioRepository.obtener_usuario_por_email(db, email)
+        if usuario is None:
+            raise LookupError("No existe un usuario con ese correo.")
+
+        rol = RolRepository.obtener_rol_por_id(db=db, id_rol=id_rol)
+        if rol is None or not rol.activo:
+            raise LookupError("Rol no encontrado o inactivo.")
+        if rol.id_empresa is not None and rol.id_empresa != id_empresa:
+            raise ValueError("El rol no pertenece a esta empresa.")
+
+        usuarios_rol = EmpresaRepository.obtener_usuarios_rol_por_empresa(
+            db=db,
+            id_usuario=usuario.id_usuario,
+            id_empresa=id_empresa,
+        )
+        if not usuarios_rol and not activo:
+            raise LookupError("No existe relacion del usuario con esta empresa.")
+
+        try:
+            if not activo:
+                for usuario_rol in usuarios_rol:
+                    usuario_rol.activo = False
+
+                db.commit()
+                for usuario_rol in usuarios_rol:
+                    db.refresh(usuario_rol)
+                return usuarios_rol
+
+            todas_apagadas = bool(usuarios_rol) and all(
+                not usuario_rol.activo for usuario_rol in usuarios_rol
+            )
+            if todas_apagadas:
+                for usuario_rol in usuarios_rol:
+                    usuario_rol.activo = True
+
+            existentes_por_sucursal = {}
+            existentes_por_sucursal_y_rol = {}
+            for usuario_rol in usuarios_rol:
+                if usuario_rol.id_sucursal is None:
+                    continue
+                existentes_por_sucursal.setdefault(usuario_rol.id_sucursal, usuario_rol)
+                existentes_por_sucursal_y_rol[
+                    (usuario_rol.id_sucursal, usuario_rol.id_rol)
+                ] = usuario_rol
+
+            ids_sucursales_solicitadas = set(id_sucursales_unicas)
+            relaciones_seleccionadas = set()
+            relaciones_creadas = []
+
+            for sucursal in sucursales_encontradas:
+                usuario_rol = existentes_por_sucursal_y_rol.get(
+                    (sucursal.id_sucursal, id_rol)
+                )
+                if usuario_rol is None:
+                    usuario_rol = existentes_por_sucursal.get(sucursal.id_sucursal)
+
+                if usuario_rol is None:
+                    usuario_rol = EmpresaRepository.crear_usuario_rol(
+                        db=db,
+                        id_usuario=usuario.id_usuario,
+                        id_rol=id_rol,
+                        id_empresa=id_empresa,
+                        id_sucursal=sucursal.id_sucursal,
+                        activo=True,
+                    )
+                    relaciones_creadas.append(usuario_rol)
+                else:
+                    usuario_rol.id_rol = id_rol
+                    usuario_rol.activo = True
+
+                relaciones_seleccionadas.add(usuario_rol.id_usuario_rol)
+
+            for usuario_rol in usuarios_rol:
+                if usuario_rol.id_sucursal is None:
+                    continue
+                if usuario_rol.id_sucursal not in ids_sucursales_solicitadas:
+                    usuario_rol.activo = False
+                elif usuario_rol.id_usuario_rol not in relaciones_seleccionadas:
+                    usuario_rol.activo = False
+
+            db.commit()
+
+            resultado = EmpresaRepository.obtener_usuarios_rol_por_empresa(
+                db=db,
+                id_usuario=usuario.id_usuario,
+                id_empresa=id_empresa,
+            )
+            for usuario_rol in [*resultado, *relaciones_creadas]:
+                db.refresh(usuario_rol)
+            return resultado
+        except IntegrityError as exc:
+            db.rollback()
+            raise ValueError("No se pudo editar el personal.") from exc
+        except Exception:
+            db.rollback()
+            raise
 
     @staticmethod
     def obtener_clientes_de_empresa(

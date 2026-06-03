@@ -23,8 +23,10 @@ from app.schemas.movimiento_caja_schema import (
 )
 from app.schemas.sucursal_schema import (
     ClienteEmpresaResponse,
+    EditarPersonalCreate,
     InvitacionClienteCreate,
     InvitacionEmpleadoCreate,
+    PersonalEmpresaAgrupadoResponse,
     PersonalEmpresaResponse,
     SucursalEmpleadoAsignadaResponse,
     SucursalCreate,
@@ -198,7 +200,7 @@ def invitar_cliente(
 
 @empresa_router.get(
     "/{id_empresa}/personal",
-    response_model=list[PersonalEmpresaResponse],
+    response_model=list[PersonalEmpresaAgrupadoResponse],
 )
 def obtener_personal_empresa(
     id_empresa: int,
@@ -217,6 +219,34 @@ def obtener_personal_empresa(
         raise HTTPException(status_code=400, detail=str(e))
     except Exception:
         raise HTTPException(status_code=500, detail="Error al obtener el personal.")
+
+
+@empresa_router.put(
+    "/{id_empresa}/editarpersonal",
+    response_model=list[PersonalEmpresaResponse],
+)
+def editar_personal_empresa(
+    id_empresa: int,
+    datos: EditarPersonalCreate,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    try:
+        return SucursalService.editar_personal_de_empresa(
+            db=db,
+            current_user=current_user,
+            id_empresa=id_empresa,
+            email=datos.email,
+            id_sucursales=datos.id_sucursales,
+            id_rol=datos.id_rol,
+            activo=datos.activo,
+        )
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception:
+        raise HTTPException(status_code=500, detail="Error al editar el personal.")
 
 
 @empresa_router.get(
