@@ -1,6 +1,6 @@
 from datetime import date
 
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field, PositiveInt
 
 from app.schemas.cliente_schema import ClienteResponse
 
@@ -22,6 +22,15 @@ class SucursalUpdate(BaseModel):
 
 class InvitacionEmpleadoCreate(BaseModel):
     email: EmailStr
+    id_sucursales: list[PositiveInt] = Field(..., min_length=1)
+    id_rol: PositiveInt
+
+
+class EditarPersonalCreate(BaseModel):
+    email: EmailStr
+    id_sucursales: list[PositiveInt] = Field(..., min_length=1)
+    id_rol: PositiveInt
+    activo: bool
 
 
 class InvitacionClienteCreate(BaseModel):
@@ -61,6 +70,33 @@ class EmpleadoSucursalResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class PersonalEmpresaResponse(BaseModel):
+    id_usuario_rol: int
+    id_usuario: int
+    id_rol: int
+    id_empresa: int
+    id_sucursal: int | None
+    activo: bool
+    usuario: UsuarioEmpleadoResponse
+
+    class Config:
+        from_attributes = True
+
+
+class PersonalRelacionResponse(BaseModel):
+    id_usuario_rol: int
+    id_rol: int
+    id_empresa: int
+    id_sucursal: int | None
+    activo: bool
+
+
+class PersonalEmpresaAgrupadoResponse(BaseModel):
+    id_usuario: int
+    usuario: UsuarioEmpleadoResponse
+    relaciones: list[PersonalRelacionResponse]
 
 
 class ClienteEmpresaResponse(BaseModel):

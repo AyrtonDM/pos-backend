@@ -23,9 +23,11 @@ from app.schemas.movimiento_caja_schema import (
 )
 from app.schemas.sucursal_schema import (
     ClienteEmpresaResponse,
-    EmpleadoSucursalResponse,
+    EditarPersonalCreate,
     InvitacionClienteCreate,
     InvitacionEmpleadoCreate,
+    PersonalEmpresaAgrupadoResponse,
+    PersonalEmpresaResponse,
     SucursalEmpleadoAsignadaResponse,
     SucursalCreate,
     SucursalResponse,
@@ -150,10 +152,9 @@ def obtener_sucursal(
         raise HTTPException(status_code=500, detail="Error al obtener la sucursal.")
 
 
-@empresa_router.post("/{id_empresa}/sucursales/{id_sucursal}/invitar-empleado")
+@empresa_router.post("/{id_empresa}/invitar-empleado")
 def invitar_empleado(
     id_empresa: int,
-    id_sucursal: int,
     datos: InvitacionEmpleadoCreate,
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(get_current_user),
@@ -163,8 +164,9 @@ def invitar_empleado(
             db=db,
             current_user=current_user,
             id_empresa=id_empresa,
-            id_sucursal=id_sucursal,
             email=datos.email,
+            id_sucursales=datos.id_sucursales,
+            id_rol=datos.id_rol,
         )
     except LookupError as e:
         raise HTTPException(status_code=404, detail=str(e))
@@ -197,28 +199,54 @@ def invitar_cliente(
 
 
 @empresa_router.get(
-    "/{id_empresa}/sucursales/{id_sucursal}/empleados",
-    response_model=list[EmpleadoSucursalResponse],
+    "/{id_empresa}/personal",
+    response_model=list[PersonalEmpresaAgrupadoResponse],
 )
-def obtener_empleados_sucursal(
+def obtener_personal_empresa(
     id_empresa: int,
-    id_sucursal: int,
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(get_current_user),
 ):
     try:
-        return SucursalService.obtener_empleados_de_sucursal(
+        return SucursalService.obtener_personal_de_empresa(
             db=db,
             current_user=current_user,
             id_empresa=id_empresa,
-            id_sucursal=id_sucursal,
         )
     except LookupError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception:
-        raise HTTPException(status_code=500, detail="Error al obtener los empleados.")
+        raise HTTPException(status_code=500, detail="Error al obtener el personal.")
+
+
+@empresa_router.put(
+    "/{id_empresa}/editarpersonal",
+    response_model=list[PersonalEmpresaResponse],
+)
+def editar_personal_empresa(
+    id_empresa: int,
+    datos: EditarPersonalCreate,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    try:
+        return SucursalService.editar_personal_de_empresa(
+            db=db,
+            current_user=current_user,
+            id_empresa=id_empresa,
+            email=datos.email,
+            id_sucursales=datos.id_sucursales,
+            id_rol=datos.id_rol,
+            activo=datos.activo,
+        )
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception:
+        raise HTTPException(status_code=500, detail="Error al editar el personal.")
 
 
 @empresa_router.get(
@@ -533,19 +561,15 @@ def obtener_mis_sucursales_empleado(
         raise HTTPException(status_code=500, detail="Error al obtener las sucursales.")
 
 
-@invitacion_router.get("/empleado/aceptar/{id_empresa}/{id_sucursal}/{id_usuario}")
+@invitacion_router.get("/empleado/aceptar/{token}")
 def aceptar_invitacion_empleado(
-    id_empresa: int,
-    id_sucursal: int,
-    id_usuario: int,
+    token: str,
     db: Session = Depends(get_db),
 ):
     try:
         return SucursalService.aceptar_invitacion_empleado(
             db=db,
-            id_empresa=id_empresa,
-            id_sucursal=id_sucursal,
-            id_usuario=id_usuario,
+            token=token,
         )
     except LookupError as e:
         raise HTTPException(status_code=404, detail=str(e))

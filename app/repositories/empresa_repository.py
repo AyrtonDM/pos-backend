@@ -126,6 +126,21 @@ class EmpresaRepository:
         )
 
     @staticmethod
+    def obtener_usuarios_rol_por_empresa(
+        db: Session,
+        id_usuario: int,
+        id_empresa: int,
+    ) -> list[UsuarioRol]:
+        return (
+            db.query(UsuarioRol)
+            .options(joinedload(UsuarioRol.usuario).joinedload(Usuario.persona))
+            .filter(
+                UsuarioRol.id_usuario == id_usuario,
+                UsuarioRol.id_empresa == id_empresa,
+            )
+            .all()
+        )
+
     def obtener_usuario_rol_por_sucursal_y_rol(
         db: Session,
         id_usuario: int,
@@ -179,6 +194,28 @@ class EmpresaRepository:
                 UsuarioRol.id_sucursal == id_sucursal,
                 UsuarioRol.id_rol == id_rol,
                 UsuarioRol.activo.is_(True),
+            )
+            .all()
+        )
+
+    @staticmethod
+    def obtener_personal_por_empresa_excluyendo_roles(
+        db: Session,
+        id_empresa: int,
+        roles_excluidos: list[str],
+    ) -> list[UsuarioRol]:
+        return (
+            db.query(UsuarioRol)
+            .join(Rol, Rol.id_rol == UsuarioRol.id_rol)
+            .options(joinedload(UsuarioRol.usuario).joinedload(Usuario.persona))
+            .filter(
+                UsuarioRol.id_empresa == id_empresa,
+                Rol.nombre.notin_(roles_excluidos),
+            )
+            .order_by(
+                UsuarioRol.id_usuario.asc(),
+                UsuarioRol.id_sucursal.asc(),
+                UsuarioRol.id_usuario_rol.asc(),
             )
             .all()
         )
