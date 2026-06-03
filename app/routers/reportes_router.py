@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import date
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
@@ -8,7 +10,13 @@ from app.core.security import get_current_user
 from app.models.empresas import Empresa
 from app.models.usuarios import Usuario
 from app.schemas.reporte_schema import (
+    DetalleVentasEmpresaResponse,
+    EstadoInventarioEmpresaResponse,
+    MovimientosCajaEmpresaResponse,
+    MovimientosInventarioEmpresaResponse,
     PlantillaReporte,
+    ResumenCajasEmpresaResponse,
+    ResumenVentasEmpresaResponse,
     RespuestaInterpretacion,
     RespuestaReporte,
     SolicitudReporte,
@@ -30,6 +38,130 @@ def get_db():
 @router.get("/templates", response_model=list[PlantillaReporte])
 def listar_plantillas(_: Usuario = Depends(get_current_user)):
     return ReportesService.obtener_catalogo()
+
+
+@router.get("/{empresa_id}/resumenventas", response_model=ResumenVentasEmpresaResponse)
+def obtener_resumen_ventas(
+    empresa_id: int,
+    fecha: date | None = None,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    try:
+        return ReportesService.obtener_resumen_ventas_empresa(
+            db=db,
+            current_user=current_user,
+            empresa_id=empresa_id,
+            fecha_reporte=fecha,
+        )
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=401, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Error al obtener el resumen de ventas: {exc}") from exc
+
+
+@router.get("/{empresa_id}/detallesventas", response_model=DetalleVentasEmpresaResponse)
+def obtener_detalle_ventas(
+    empresa_id: int,
+    fecha: date | None = None,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    try:
+        return ReportesService.obtener_detalle_ventas_empresa(
+            db=db,
+            current_user=current_user,
+            empresa_id=empresa_id,
+            fecha_reporte=fecha,
+        )
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=401, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Error al obtener el detalle de ventas: {exc}") from exc
+
+
+@router.get("/{empresa_id}/estadoinventario", response_model=EstadoInventarioEmpresaResponse)
+def obtener_estado_inventario(
+    empresa_id: int,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    try:
+        return ReportesService.obtener_estado_inventario_empresa(
+            db=db,
+            current_user=current_user,
+            empresa_id=empresa_id,
+        )
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=401, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Error al obtener el estado de inventario: {exc}") from exc
+
+
+@router.get("/{empresa_id}/movimientosinventario", response_model=MovimientosInventarioEmpresaResponse)
+def obtener_movimientos_inventario(
+    empresa_id: int,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    try:
+        return ReportesService.obtener_movimientos_inventario_empresa(
+            db=db,
+            current_user=current_user,
+            empresa_id=empresa_id,
+        )
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=401, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Error al obtener los movimientos de inventario: {exc}") from exc
+
+
+@router.get("/{empresa_id}/resumencajas", response_model=ResumenCajasEmpresaResponse)
+def obtener_resumen_cajas(
+    empresa_id: int,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    try:
+        return ReportesService.obtener_resumen_cajas_empresa(
+            db=db,
+            current_user=current_user,
+            empresa_id=empresa_id,
+        )
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=401, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Error al obtener el resumen de cajas: {exc}") from exc
+
+
+@router.get("/{empresa_id}/movimientoscaja", response_model=MovimientosCajaEmpresaResponse)
+def obtener_movimientos_caja(
+    empresa_id: int,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    try:
+        return ReportesService.obtener_movimientos_caja_empresa(
+            db=db,
+            current_user=current_user,
+            empresa_id=empresa_id,
+        )
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=401, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Error al obtener los movimientos de caja: {exc}") from exc
 
 
 @router.post("/{empresa_id}/interpretar", response_model=RespuestaInterpretacion)

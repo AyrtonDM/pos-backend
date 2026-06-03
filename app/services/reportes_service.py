@@ -24,10 +24,17 @@ from app.models.ventas import DetalleVenta, MetodoPago, Venta, VentaPago
 from app.models.clientes.cliente import Cliente
 from app.models.usuarios.usuario import Usuario
 from app.models.usuarios.persona import Persona
+from app.repositories.empresa_repository import EmpresaRepository
 from app.schemas.reporte_schema import (
     ColumnaReporte,
+    DetalleVentasEmpresaResponse,
+    EstadoInventarioEmpresaResponse,
     EspecificacionReporte,
+    MovimientosCajaEmpresaResponse,
+    MovimientosInventarioEmpresaResponse,
     PlantillaReporte,
+    ResumenCajasEmpresaResponse,
+    ResumenVentasEmpresaResponse,
     RespuestaReporte,
     SolicitudReporte,
 )
@@ -244,9 +251,9 @@ def _clasificar_tipo_movimiento(nombre: str | None) -> str:
         return "desconocido"
 
     normalizado = _normalizar_texto(nombre)
-    if any(palabra in normalizado for palabra in ["ingreso", "entrada", "abono", "cobro", "venta"]):
+    if any(palabra in normalizado for palabra in ["ingreso", "entrada", "abono", "cobro", "venta", "positivo"]):
         return "ingreso"
-    if any(palabra in normalizado for palabra in ["egreso", "salida", "retiro", "pago"]):
+    if any(palabra in normalizado for palabra in ["egreso", "salida", "retiro", "pago", "negativo"]):
         return "egreso"
     return "desconocido"
 
@@ -342,6 +349,765 @@ class ReportesService:
     @staticmethod
     def obtener_catalogo() -> list[PlantillaReporte]:
         return obtener_plantillas()
+
+    @staticmethod
+    def obtener_resumen_ventas_empresa(
+        db: Session,
+        current_user: Usuario,
+        empresa_id: int,
+        fecha_reporte: date | None = None,
+    ) -> ResumenVentasEmpresaResponse:
+        if current_user is None or not current_user.activo:
+            raise ValueError("Usuario no autorizado o inactivo.")
+
+        empresa = EmpresaRepository.obtener_empresa_por_usuario(
+            db=db,
+            id_usuario=current_user.id_usuario,
+            id_empresa=empresa_id,
+        )
+        if empresa is None:
+            raise LookupError("Empresa no encontrada para este usuario.")
+
+        fecha_reporte = fecha_reporte or datetime.utcnow().date()
+        inicio = datetime.combine(fecha_reporte, time.min)
+        fin = datetime.combine(fecha_reporte, time.max)
+
+        sucursales = (
+            db.query(Sucursal)
+            .filter(Sucursal.id_empresa == empresa_id)
+            .order_by(Sucursal.nombre.asc())
+            .all()
+        )
+
+        ventas_por_sucursal = {
+            int(fila.id_sucursal): {
+                "total_ventas": int(fila.total_ventas or 0),
+                "monto_vendido": float(fila.monto_vendido or 0),
+            }
+            for fila in (
+                db.query(
+                    Sucursal.id_sucursal.label("id_sucursal"),
+                    func.count(Venta.id_venta).label("total_ventas"),
+                    func.coalesce(func.sum(Venta.total), 0).label("monto_vendido"),
+                )
+                .join(Caja, Sucursal.id_sucursal == Caja.id_sucursal)
+                .join(CajaSesion, Caja.id_caja == CajaSesion.id_caja)
+                .join(Venta, CajaSesion.id_caja_sesion == Venta.id_caja_sesion)
+                .filter(Sucursal.id_empresa == empresa_id)
+                .filter(Venta.fecha.between(inicio, fin))
+                .filter(Venta.estado != "ANULADA")
+                .group_by(Sucursal.id_sucursal)
+                .all()
+            )
+        }
+
+        productos_vendidos_por_sucursal = {
+            int(fila.id_sucursal): int(fila.productos_vendidos or 0)
+            for fila in (
+                db.query(
+                    Sucursal.id_sucursal.label("id_sucursal"),
+                    func.coalesce(func.sum(DetalleVenta.cantidad), 0).label("productos_vendidos"),
+                )
+                .join(Caja, Sucursal.id_sucursal == Caja.id_sucursal)
+                .join(CajaSesion, Caja.id_caja == CajaSesion.id_caja)
+                .join(Venta, CajaSesion.id_caja_sesion == Venta.id_caja_sesion)
+                .join(DetalleVenta, Venta.id_venta == DetalleVenta.id_venta)
+                .filter(Sucursal.id_empresa == empresa_id)
+                .filter(Venta.fecha.between(inicio, fin))
+                .filter(Venta.estado != "ANULADA")
+                .group_by(Sucursal.id_sucursal)
+                .all()
+            )
+        }
+
+        top_productos_por_sucursal: dict[int, list[dict[str, Any]]] = {}
+        top_rows = (
+            db.query(
+                Sucursal.id_sucursal.label("id_sucursal"),
+                Producto.id_producto.label("id_producto"),
+                Producto.nombre.label("producto"),
+                func.coalesce(func.sum(DetalleVenta.cantidad), 0).label("unidades"),
+            )
+            .join(Caja, Sucursal.id_sucursal == Caja.id_sucursal)
+            .join(CajaSesion, Caja.id_caja == CajaSesion.id_caja)
+            .join(Venta, CajaSesion.id_caja_sesion == Venta.id_caja_sesion)
+            .join(DetalleVenta, Venta.id_venta == DetalleVenta.id_venta)
+            .join(Producto, DetalleVenta.id_producto == Producto.id_producto)
+            .filter(Sucursal.id_empresa == empresa_id)
+            .filter(Venta.fecha.between(inicio, fin))
+            .filter(Venta.estado != "ANULADA")
+            .group_by(Sucursal.id_sucursal, Producto.id_producto, Producto.nombre)
+            .order_by(Sucursal.id_sucursal.asc(), func.sum(DetalleVenta.cantidad).desc(), Producto.nombre.asc())
+            .all()
+        )
+        for fila in top_rows:
+            id_sucursal = int(fila.id_sucursal)
+            productos = top_productos_por_sucursal.setdefault(id_sucursal, [])
+            if len(productos) >= 3:
+                continue
+            productos.append(
+                {
+                    "posicion": len(productos) + 1,
+                    "id_producto": int(fila.id_producto),
+                    "producto": fila.producto,
+                    "unidades": int(fila.unidades or 0),
+                }
+            )
+
+        sucursales_resumen = []
+        total_ventas_empresa = 0
+        monto_vendido_empresa = 0.0
+        productos_vendidos_empresa = 0
+
+        for sucursal in sucursales:
+            ventas = ventas_por_sucursal.get(
+                sucursal.id_sucursal,
+                {"total_ventas": 0, "monto_vendido": 0.0},
+            )
+            total_ventas = ventas["total_ventas"]
+            monto_vendido = ventas["monto_vendido"]
+            productos_vendidos = productos_vendidos_por_sucursal.get(sucursal.id_sucursal, 0)
+            ticket_promedio = round(monto_vendido / total_ventas, 2) if total_ventas else 0.0
+
+            total_ventas_empresa += total_ventas
+            monto_vendido_empresa += monto_vendido
+            productos_vendidos_empresa += productos_vendidos
+
+            sucursales_resumen.append(
+                {
+                    "id_sucursal": sucursal.id_sucursal,
+                    "sucursal": sucursal.nombre,
+                    "ventas_dia": {
+                        "total_ventas": total_ventas,
+                        "monto_vendido": round(monto_vendido, 2),
+                        "ticket_promedio": ticket_promedio,
+                        "productos_vendidos": productos_vendidos,
+                    },
+                    "top_productos": top_productos_por_sucursal.get(sucursal.id_sucursal, []),
+                }
+            )
+
+        ticket_promedio_empresa = (
+            round(monto_vendido_empresa / total_ventas_empresa, 2)
+            if total_ventas_empresa
+            else 0.0
+        )
+
+        return ResumenVentasEmpresaResponse(
+            id_empresa=empresa_id,
+            fecha=fecha_reporte,
+            sucursales=sucursales_resumen,
+            total_empresa={
+                "total_ventas": total_ventas_empresa,
+                "monto_vendido": round(monto_vendido_empresa, 2),
+                "ticket_promedio": ticket_promedio_empresa,
+                "productos_vendidos": productos_vendidos_empresa,
+            },
+        )
+
+    @staticmethod
+    def obtener_detalle_ventas_empresa(
+        db: Session,
+        current_user: Usuario,
+        empresa_id: int,
+        fecha_reporte: date | None = None,
+    ) -> DetalleVentasEmpresaResponse:
+        if current_user is None or not current_user.activo:
+            raise ValueError("Usuario no autorizado o inactivo.")
+
+        empresa = EmpresaRepository.obtener_empresa_por_usuario(
+            db=db,
+            id_usuario=current_user.id_usuario,
+            id_empresa=empresa_id,
+        )
+        if empresa is None:
+            raise LookupError("Empresa no encontrada para este usuario.")
+
+        fecha_reporte = fecha_reporte or datetime.utcnow().date()
+        inicio = datetime.combine(fecha_reporte, time.min)
+        fin = datetime.combine(fecha_reporte, time.max)
+
+        sucursales = (
+            db.query(Sucursal)
+            .filter(Sucursal.id_empresa == empresa_id)
+            .order_by(Sucursal.nombre.asc())
+            .all()
+        )
+
+        ventas_por_sucursal: dict[int, list[dict[str, Any]]] = {
+            sucursal.id_sucursal: [] for sucursal in sucursales
+        }
+
+        filas = (
+            db.query(
+                Sucursal.id_sucursal.label("id_sucursal"),
+                Venta.id_venta.label("id_venta"),
+                Venta.fecha.label("fecha"),
+                Persona.nombre_completo.label("cliente"),
+                func.coalesce(Venta.subtotal, 0).label("subtotal"),
+                func.coalesce(Venta.descuento_total, 0).label("descuento"),
+                func.coalesce(Venta.total, 0).label("total"),
+            )
+            .join(Caja, Sucursal.id_sucursal == Caja.id_sucursal)
+            .join(CajaSesion, Caja.id_caja == CajaSesion.id_caja)
+            .join(Venta, CajaSesion.id_caja_sesion == Venta.id_caja_sesion)
+            .outerjoin(Cliente, Venta.id_cliente == Cliente.id_cliente)
+            .outerjoin(Usuario, Cliente.id_usuario == Usuario.id_usuario)
+            .outerjoin(Persona, Usuario.id_persona == Persona.id_persona)
+            .filter(Sucursal.id_empresa == empresa_id)
+            .filter(Venta.fecha.between(inicio, fin))
+            .filter(Venta.estado != "ANULADA")
+            .order_by(Sucursal.nombre.asc(), Venta.fecha.asc(), Venta.id_venta.asc())
+            .all()
+        )
+
+        for fila in filas:
+            ventas_por_sucursal.setdefault(int(fila.id_sucursal), []).append(
+                {
+                    "id_venta": int(fila.id_venta),
+                    "numero_venta": f"{int(fila.id_venta):03d}",
+                    "hora": fila.fecha.strftime("%H:%M") if fila.fecha else "",
+                    "cliente": fila.cliente,
+                    "subtotal": float(fila.subtotal or 0),
+                    "descuento": float(fila.descuento or 0),
+                    "total": float(fila.total or 0),
+                }
+            )
+
+        sucursales_detalle = []
+        total_registros_empresa = 0
+        total_vendido_empresa = 0.0
+
+        for sucursal in sucursales:
+            ventas = ventas_por_sucursal.get(sucursal.id_sucursal, [])
+            total_registros = len(ventas)
+            total_vendido = round(sum(venta["total"] for venta in ventas), 2)
+
+            total_registros_empresa += total_registros
+            total_vendido_empresa += total_vendido
+
+            sucursales_detalle.append(
+                {
+                    "id_sucursal": sucursal.id_sucursal,
+                    "sucursal": sucursal.nombre,
+                    "ventas": ventas,
+                    "resumen_sucursal": {
+                        "total_registros": total_registros,
+                        "total_vendido": total_vendido,
+                    },
+                }
+            )
+
+        return DetalleVentasEmpresaResponse(
+            id_empresa=empresa_id,
+            fecha=fecha_reporte,
+            sucursales=sucursales_detalle,
+            total_empresa={
+                "total_registros": total_registros_empresa,
+                "total_vendido": round(total_vendido_empresa, 2),
+            },
+        )
+
+    @staticmethod
+    def obtener_estado_inventario_empresa(
+        db: Session,
+        current_user: Usuario,
+        empresa_id: int,
+    ) -> EstadoInventarioEmpresaResponse:
+        if current_user is None or not current_user.activo:
+            raise ValueError("Usuario no autorizado o inactivo.")
+
+        empresa = EmpresaRepository.obtener_empresa_por_usuario(
+            db=db,
+            id_usuario=current_user.id_usuario,
+            id_empresa=empresa_id,
+        )
+        if empresa is None:
+            raise LookupError("Empresa no encontrada para este usuario.")
+
+        fecha_reporte = datetime.utcnow().date()
+        sucursales = (
+            db.query(Sucursal)
+            .filter(Sucursal.id_empresa == empresa_id)
+            .order_by(Sucursal.nombre.asc())
+            .all()
+        )
+
+        stocks_por_sucursal: dict[int, list[dict[str, Any]]] = {
+            sucursal.id_sucursal: [] for sucursal in sucursales
+        }
+        filas = (
+            db.query(
+                Sucursal.id_sucursal.label("id_sucursal"),
+                Producto.id_producto.label("id_producto"),
+                Producto.nombre.label("producto"),
+                Stock.cantidad.label("stock_actual"),
+                Stock.stock_minimo.label("stock_minimo"),
+                Stock.stock_maximo.label("stock_maximo"),
+            )
+            .join(Stock, Sucursal.id_sucursal == Stock.id_sucursal)
+            .join(Producto, Stock.id_producto == Producto.id_producto)
+            .filter(Sucursal.id_empresa == empresa_id)
+            .order_by(Sucursal.nombre.asc(), Producto.nombre.asc())
+            .all()
+        )
+
+        for fila in filas:
+            stock_actual = int(fila.stock_actual or 0)
+            stock_minimo = int(fila.stock_minimo) if fila.stock_minimo is not None else None
+            stock_maximo = int(fila.stock_maximo) if fila.stock_maximo is not None else None
+
+            if stock_actual <= 0:
+                estado = "Agotado"
+            elif stock_minimo is not None and stock_actual < stock_minimo:
+                estado = "Bajo stock"
+            elif stock_maximo is not None and stock_actual > stock_maximo:
+                estado = "Sobre stock"
+            else:
+                estado = "Normal"
+
+            stocks_por_sucursal.setdefault(int(fila.id_sucursal), []).append(
+                {
+                    "id_producto": int(fila.id_producto),
+                    "producto": fila.producto,
+                    "stock_actual": stock_actual,
+                    "stock_minimo": stock_minimo,
+                    "stock_maximo": stock_maximo,
+                    "estado": estado,
+                }
+            )
+
+        sucursales_estado = []
+        total_productos_empresa = 0
+        bajo_stock_empresa = 0
+        sobre_stock_empresa = 0
+        agotados_empresa = 0
+
+        for sucursal in sucursales:
+            productos = stocks_por_sucursal.get(sucursal.id_sucursal, [])
+            total_productos = len(productos)
+            bajo_stock = sum(1 for producto in productos if producto["estado"] == "Bajo stock")
+            sobre_stock = sum(1 for producto in productos if producto["estado"] == "Sobre stock")
+            agotados = sum(1 for producto in productos if producto["estado"] == "Agotado")
+
+            total_productos_empresa += total_productos
+            bajo_stock_empresa += bajo_stock
+            sobre_stock_empresa += sobre_stock
+            agotados_empresa += agotados
+
+            sucursales_estado.append(
+                {
+                    "id_sucursal": sucursal.id_sucursal,
+                    "sucursal": sucursal.nombre,
+                    "productos": productos,
+                    "resumen_sucursal": {
+                        "total_productos": total_productos,
+                        "productos_bajo_stock": bajo_stock,
+                        "productos_sobre_stock": sobre_stock,
+                        "productos_agotados": agotados,
+                    },
+                }
+            )
+
+        return EstadoInventarioEmpresaResponse(
+            id_empresa=empresa_id,
+            fecha=fecha_reporte,
+            sucursales=sucursales_estado,
+            total_empresa={
+                "total_productos": total_productos_empresa,
+                "productos_bajo_stock": bajo_stock_empresa,
+                "productos_sobre_stock": sobre_stock_empresa,
+                "productos_agotados": agotados_empresa,
+            },
+        )
+
+    @staticmethod
+    def obtener_movimientos_inventario_empresa(
+        db: Session,
+        current_user: Usuario,
+        empresa_id: int,
+    ) -> MovimientosInventarioEmpresaResponse:
+        if current_user is None or not current_user.activo:
+            raise ValueError("Usuario no autorizado o inactivo.")
+
+        empresa = EmpresaRepository.obtener_empresa_por_usuario(
+            db=db,
+            id_usuario=current_user.id_usuario,
+            id_empresa=empresa_id,
+        )
+        if empresa is None:
+            raise LookupError("Empresa no encontrada para este usuario.")
+
+        fecha_fin = datetime.utcnow().date()
+        fecha_inicio = fecha_fin - timedelta(days=6)
+        inicio = datetime.combine(fecha_inicio, time.min)
+        fin = datetime.combine(fecha_fin, time.max)
+
+        sucursales = (
+            db.query(Sucursal)
+            .filter(Sucursal.id_empresa == empresa_id)
+            .order_by(Sucursal.nombre.asc())
+            .all()
+        )
+
+        movimientos_por_sucursal: dict[int, list[dict[str, Any]]] = {
+            sucursal.id_sucursal: [] for sucursal in sucursales
+        }
+
+        filas = (
+            db.query(
+                Sucursal.id_sucursal.label("id_sucursal"),
+                MovimientoInventario.id_movimiento_inventario.label("id_movimiento_inventario"),
+                MovimientoInventario.fecha_movimiento.label("fecha_movimiento"),
+                TipoMovimiento.nombre.label("tipo_movimiento"),
+                TipoMovimiento.direccion.label("direccion"),
+                Producto.nombre.label("producto"),
+                MovimientoInventario.cantidad.label("cantidad"),
+            )
+            .join(Sucursal, MovimientoInventario.id_sucursal == Sucursal.id_sucursal)
+            .join(TipoMovimiento, MovimientoInventario.id_tipo_movimiento == TipoMovimiento.id_tipo_movimiento)
+            .join(Producto, MovimientoInventario.id_producto == Producto.id_producto)
+            .filter(Sucursal.id_empresa == empresa_id)
+            .filter(MovimientoInventario.fecha_movimiento.between(inicio, fin))
+            .order_by(
+                Sucursal.nombre.asc(),
+                MovimientoInventario.fecha_movimiento.desc(),
+                MovimientoInventario.id_movimiento_inventario.desc(),
+            )
+            .all()
+        )
+
+        for fila in filas:
+            movimientos_por_sucursal.setdefault(int(fila.id_sucursal), []).append(
+                {
+                    "id_movimiento_inventario": int(fila.id_movimiento_inventario),
+                    "fecha": fila.fecha_movimiento.date() if fila.fecha_movimiento else fecha_fin,
+                    "tipo_movimiento": fila.tipo_movimiento,
+                    "direccion": fila.direccion,
+                    "producto": fila.producto,
+                    "cantidad": int(fila.cantidad or 0),
+                }
+            )
+
+        sucursales_movimientos = []
+        total_entradas_empresa = 0
+        total_salidas_empresa = 0
+
+        for sucursal in sucursales:
+            movimientos = movimientos_por_sucursal.get(sucursal.id_sucursal, [])
+            total_entradas = sum(
+                movimiento["cantidad"]
+                for movimiento in movimientos
+                if str(movimiento["direccion"]).upper() == "ENTRADA"
+            )
+            total_salidas = sum(
+                movimiento["cantidad"]
+                for movimiento in movimientos
+                if str(movimiento["direccion"]).upper() == "SALIDA"
+            )
+
+            total_entradas_empresa += total_entradas
+            total_salidas_empresa += total_salidas
+
+            sucursales_movimientos.append(
+                {
+                    "id_sucursal": sucursal.id_sucursal,
+                    "sucursal": sucursal.nombre,
+                    "movimientos": movimientos,
+                    "resumen_sucursal": {
+                        "total_entradas": total_entradas,
+                        "total_salidas": total_salidas,
+                    },
+                }
+            )
+
+        return MovimientosInventarioEmpresaResponse(
+            id_empresa=empresa_id,
+            fecha_inicio=fecha_inicio,
+            fecha_fin=fecha_fin,
+            sucursales=sucursales_movimientos,
+            total_empresa={
+                "total_entradas": total_entradas_empresa,
+                "total_salidas": total_salidas_empresa,
+            },
+        )
+
+    @staticmethod
+    def obtener_resumen_cajas_empresa(
+        db: Session,
+        current_user: Usuario,
+        empresa_id: int,
+    ) -> ResumenCajasEmpresaResponse:
+        if current_user is None or not current_user.activo:
+            raise ValueError("Usuario no autorizado o inactivo.")
+
+        empresa = EmpresaRepository.obtener_empresa_por_usuario(
+            db=db,
+            id_usuario=current_user.id_usuario,
+            id_empresa=empresa_id,
+        )
+        if empresa is None:
+            raise LookupError("Empresa no encontrada para este usuario.")
+
+        fecha_reporte = datetime.utcnow().date()
+        inicio = datetime.combine(fecha_reporte, time.min)
+        fin = datetime.combine(fecha_reporte, time.max)
+
+        sucursales = (
+            db.query(Sucursal)
+            .filter(Sucursal.id_empresa == empresa_id)
+            .order_by(Sucursal.nombre.asc())
+            .all()
+        )
+
+        cajas_por_sucursal: dict[int, list[dict[str, Any]]] = {
+            sucursal.id_sucursal: [] for sucursal in sucursales
+        }
+        sesiones = (
+            db.query(
+                Sucursal.id_sucursal.label("id_sucursal"),
+                Caja.id_caja.label("id_caja"),
+                Caja.nombre.label("caja"),
+                CajaSesion.id_caja_sesion.label("id_caja_sesion"),
+                CajaSesion.estado.label("estado"),
+                CajaSesion.fecha_apertura.label("fecha_apertura"),
+                CajaSesion.fecha_cierre.label("fecha_cierre"),
+            )
+            .join(Caja, Sucursal.id_sucursal == Caja.id_sucursal)
+            .join(CajaSesion, Caja.id_caja == CajaSesion.id_caja)
+            .filter(Sucursal.id_empresa == empresa_id)
+            .filter(CajaSesion.fecha_apertura.between(inicio, fin))
+            .order_by(Sucursal.nombre.asc(), Caja.nombre.asc(), CajaSesion.fecha_apertura.asc())
+            .all()
+        )
+
+        for sesion in sesiones:
+            cajas_por_sucursal.setdefault(int(sesion.id_sucursal), []).append(
+                {
+                    "id_caja": int(sesion.id_caja),
+                    "id_caja_sesion": int(sesion.id_caja_sesion),
+                    "caja": sesion.caja,
+                    "estado": sesion.estado,
+                    "apertura": sesion.fecha_apertura.strftime("%H:%M") if sesion.fecha_apertura else "",
+                    "cierre": sesion.fecha_cierre.strftime("%H:%M") if sesion.fecha_cierre else None,
+                }
+            )
+
+        movimientos_por_sucursal: dict[int, dict[str, float]] = {
+            sucursal.id_sucursal: {"ingresos": 0.0, "egresos": 0.0}
+            for sucursal in sucursales
+        }
+        movimientos = (
+            db.query(
+                Sucursal.id_sucursal.label("id_sucursal"),
+                TipoMovimientoCaja.nombre.label("tipo_movimiento"),
+                func.coalesce(func.sum(MovimientoCaja.monto), 0).label("monto"),
+            )
+            .join(Caja, Sucursal.id_sucursal == Caja.id_sucursal)
+            .join(CajaSesion, Caja.id_caja == CajaSesion.id_caja)
+            .join(MovimientoCaja, CajaSesion.id_caja_sesion == MovimientoCaja.id_caja_sesion)
+            .join(
+                TipoMovimientoCaja,
+                MovimientoCaja.id_tipo_movimiento_caja == TipoMovimientoCaja.id_tipo_movimiento_caja,
+            )
+            .filter(Sucursal.id_empresa == empresa_id)
+            .filter(MovimientoCaja.fecha.between(inicio, fin))
+            .group_by(Sucursal.id_sucursal, TipoMovimientoCaja.nombre)
+            .all()
+        )
+
+        for movimiento in movimientos:
+            id_sucursal = int(movimiento.id_sucursal)
+            clasificacion = _clasificar_tipo_movimiento(movimiento.tipo_movimiento)
+            monto = float(movimiento.monto or 0)
+            if clasificacion == "ingreso":
+                movimientos_por_sucursal.setdefault(
+                    id_sucursal,
+                    {"ingresos": 0.0, "egresos": 0.0},
+                )["ingresos"] += monto
+            elif clasificacion == "egreso":
+                movimientos_por_sucursal.setdefault(
+                    id_sucursal,
+                    {"ingresos": 0.0, "egresos": 0.0},
+                )["egresos"] += monto
+
+        sucursales_resumen = []
+        total_cajas_empresa = 0
+        cajas_abiertas_empresa = 0
+        cajas_cerradas_empresa = 0
+        ingresos_empresa = 0.0
+        egresos_empresa = 0.0
+
+        for sucursal in sucursales:
+            cajas = cajas_por_sucursal.get(sucursal.id_sucursal, [])
+            total_cajas = len(cajas)
+            cajas_abiertas = sum(1 for caja in cajas if str(caja["estado"]).lower() == "abierto")
+            cajas_cerradas = sum(1 for caja in cajas if str(caja["estado"]).lower() == "cerrado")
+            movimientos_sucursal = movimientos_por_sucursal.get(
+                sucursal.id_sucursal,
+                {"ingresos": 0.0, "egresos": 0.0},
+            )
+            ingresos = round(movimientos_sucursal["ingresos"], 2)
+            egresos = round(movimientos_sucursal["egresos"], 2)
+            flujo_neto = round(ingresos - egresos, 2)
+
+            total_cajas_empresa += total_cajas
+            cajas_abiertas_empresa += cajas_abiertas
+            cajas_cerradas_empresa += cajas_cerradas
+            ingresos_empresa += ingresos
+            egresos_empresa += egresos
+
+            sucursales_resumen.append(
+                {
+                    "id_sucursal": sucursal.id_sucursal,
+                    "sucursal": sucursal.nombre,
+                    "cajas": cajas,
+                    "resumen_sucursal": {
+                        "total_cajas": total_cajas,
+                        "cajas_abiertas": cajas_abiertas,
+                        "cajas_cerradas": cajas_cerradas,
+                        "ingresos": ingresos,
+                        "egresos": egresos,
+                        "flujo_neto": flujo_neto,
+                    },
+                }
+            )
+
+        ingresos_empresa = round(ingresos_empresa, 2)
+        egresos_empresa = round(egresos_empresa, 2)
+
+        return ResumenCajasEmpresaResponse(
+            id_empresa=empresa_id,
+            fecha=fecha_reporte,
+            sucursales=sucursales_resumen,
+            total_empresa={
+                "total_cajas": total_cajas_empresa,
+                "cajas_abiertas": cajas_abiertas_empresa,
+                "cajas_cerradas": cajas_cerradas_empresa,
+                "ingresos": ingresos_empresa,
+                "egresos": egresos_empresa,
+                "flujo_neto": round(ingresos_empresa - egresos_empresa, 2),
+            },
+        )
+
+    @staticmethod
+    def obtener_movimientos_caja_empresa(
+        db: Session,
+        current_user: Usuario,
+        empresa_id: int,
+    ) -> MovimientosCajaEmpresaResponse:
+        if current_user is None or not current_user.activo:
+            raise ValueError("Usuario no autorizado o inactivo.")
+
+        empresa = EmpresaRepository.obtener_empresa_por_usuario(
+            db=db,
+            id_usuario=current_user.id_usuario,
+            id_empresa=empresa_id,
+        )
+        if empresa is None:
+            raise LookupError("Empresa no encontrada para este usuario.")
+
+        fecha_reporte = datetime.utcnow().date()
+        inicio = datetime.combine(fecha_reporte, time.min)
+        fin = datetime.combine(fecha_reporte, time.max)
+
+        sucursales = (
+            db.query(Sucursal)
+            .filter(Sucursal.id_empresa == empresa_id)
+            .order_by(Sucursal.nombre.asc())
+            .all()
+        )
+
+        movimientos_por_sucursal: dict[int, list[dict[str, Any]]] = {
+            sucursal.id_sucursal: [] for sucursal in sucursales
+        }
+        filas = (
+            db.query(
+                Sucursal.id_sucursal.label("id_sucursal"),
+                MovimientoCaja.id_movimiento_caja.label("id_movimiento_caja"),
+                MovimientoCaja.fecha.label("fecha"),
+                Caja.nombre.label("caja"),
+                TipoMovimientoCaja.nombre.label("tipo"),
+                MovimientoCaja.concepto.label("concepto"),
+                func.coalesce(MovimientoCaja.monto, 0).label("monto"),
+            )
+            .join(CajaSesion, MovimientoCaja.id_caja_sesion == CajaSesion.id_caja_sesion)
+            .join(Caja, CajaSesion.id_caja == Caja.id_caja)
+            .join(Sucursal, Caja.id_sucursal == Sucursal.id_sucursal)
+            .join(
+                TipoMovimientoCaja,
+                MovimientoCaja.id_tipo_movimiento_caja == TipoMovimientoCaja.id_tipo_movimiento_caja,
+            )
+            .filter(Sucursal.id_empresa == empresa_id)
+            .filter(MovimientoCaja.fecha.between(inicio, fin))
+            .order_by(Sucursal.nombre.asc(), MovimientoCaja.fecha.asc(), MovimientoCaja.id_movimiento_caja.asc())
+            .all()
+        )
+
+        for fila in filas:
+            movimientos_por_sucursal.setdefault(int(fila.id_sucursal), []).append(
+                {
+                    "id_movimiento_caja": int(fila.id_movimiento_caja),
+                    "hora": fila.fecha.strftime("%H:%M") if fila.fecha else "",
+                    "caja": fila.caja,
+                    "tipo": fila.tipo,
+                    "concepto": fila.concepto,
+                    "monto": float(fila.monto or 0),
+                }
+            )
+
+        sucursales_movimientos = []
+        total_movimientos_empresa = 0
+        total_ingresos_empresa = 0.0
+        total_egresos_empresa = 0.0
+
+        for sucursal in sucursales:
+            movimientos = movimientos_por_sucursal.get(sucursal.id_sucursal, [])
+            total_movimientos = len(movimientos)
+            total_ingresos = round(
+                sum(
+                    movimiento["monto"]
+                    for movimiento in movimientos
+                    if _clasificar_tipo_movimiento(movimiento["tipo"]) == "ingreso"
+                ),
+                2,
+            )
+            total_egresos = round(
+                sum(
+                    movimiento["monto"]
+                    for movimiento in movimientos
+                    if _clasificar_tipo_movimiento(movimiento["tipo"]) == "egreso"
+                ),
+                2,
+            )
+
+            total_movimientos_empresa += total_movimientos
+            total_ingresos_empresa += total_ingresos
+            total_egresos_empresa += total_egresos
+
+            sucursales_movimientos.append(
+                {
+                    "id_sucursal": sucursal.id_sucursal,
+                    "sucursal": sucursal.nombre,
+                    "movimientos": movimientos,
+                    "resumen_sucursal": {
+                        "total_movimientos": total_movimientos,
+                        "total_ingresos": total_ingresos,
+                        "total_egresos": total_egresos,
+                    },
+                }
+            )
+
+        return MovimientosCajaEmpresaResponse(
+            id_empresa=empresa_id,
+            fecha=fecha_reporte,
+            sucursales=sucursales_movimientos,
+            total_empresa={
+                "total_movimientos": total_movimientos_empresa,
+                "total_ingresos": round(total_ingresos_empresa, 2),
+                "total_egresos": round(total_egresos_empresa, 2),
+            },
+        )
 
     @staticmethod
     def interpretar_solicitud(solicitud: SolicitudReporte) -> tuple[EspecificacionReporte, list[str]]:

@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.models.usuarios import Usuario
 from app.repositories.empresa_repository import EmpresaRepository
+from app.repositories.suscripcion_repository import SuscripcionRepository
 
 
 class EmpresaService:
@@ -132,7 +133,7 @@ class EmpresaService:
             id_rol=usuario_rol.id_rol,
         )
 
-        return [
+        permisos = [
             {
                 "id_permiso": permiso.id_permiso,
                 "codigo": permiso.codigo,
@@ -143,6 +144,51 @@ class EmpresaService:
             }
             for permiso, rol_permiso_activo in permisos_y_activos
         ]
+
+        suscripcion = SuscripcionRepository.obtener_suscripcion_activa(
+            db=db,
+            id_empresa=id_empresa,
+        )
+        suscripcion_activa = None
+        if suscripcion is not None and suscripcion.plan is not None:
+            plan = suscripcion.plan
+            plan_modulos = [
+                {
+                    "id_plan_modulo": plan_modulo.id_plan_modulo,
+                    "id_plan": plan_modulo.id_plan,
+                    "id_modulo": plan_modulo.id_modulo,
+                    "configuracion": plan_modulo.configuracion,
+                    "modulo": plan_modulo.modulo,
+                }
+                for plan_modulo in sorted(
+                    plan.planes_modulo,
+                    key=lambda item: item.id_plan_modulo,
+                )
+            ]
+            suscripcion_activa = {
+                "id_historial_suscripcion": suscripcion.id_historial_suscripcion,
+                "id_empresa": suscripcion.id_empresa,
+                "id_plan": suscripcion.id_plan,
+                "fecha_inicio": suscripcion.fecha_inicio.isoformat(),
+                "fecha_fin": (
+                    suscripcion.fecha_fin.isoformat()
+                    if suscripcion.fecha_fin is not None
+                    else None
+                ),
+                "estado": suscripcion.estado,
+                "plan": {
+                    "id_plan": plan.id_plan,
+                    "nombre": plan.nombre,
+                    "descripcion": plan.descripcion,
+                    "precio": float(plan.precio),
+                    "plan_modulos": plan_modulos,
+                },
+            }
+
+        return {
+            "permisos": permisos,
+            "suscripcion_activa": suscripcion_activa,
+        }
 
     @staticmethod
     def obtener_permisos_agrupados_por_modulo(

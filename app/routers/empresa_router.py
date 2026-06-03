@@ -20,7 +20,7 @@ from app.schemas.cliente_schema import (
     ClienteUpdate,
 )
 from app.schemas.empresa_schema import EmpresaCreate, EmpresaResponse, EmpresaUpdate
-from app.schemas.permiso_schema import PermisoConRolPermisoResponse, PermisoResponse, PermisosPorModuloResponse
+from app.schemas.permiso_schema import MisPermisosEmpresaResponse, PermisoConRolPermisoResponse, PermisoResponse, PermisosPorModuloResponse
 from app.services.cliente_service import ClienteService
 from app.services.empresa_service import EmpresaService
 from app.services.producto_service import ProductoService
@@ -90,7 +90,7 @@ def listar_permisos_agrupados_por_modulo(
         raise HTTPException(status_code=500, detail="Error al listar los permisos por modulo.")
 
 
-@router.get("/{id_empresa}/mis-permisos", response_model=list[PermisoConRolPermisoResponse])
+@router.get("/{id_empresa}/mis-permisos", response_model=MisPermisosEmpresaResponse)
 def obtener_permisos_del_rol_del_usuario_en_empresa(
     id_empresa: int,
     db: Session = Depends(get_db),

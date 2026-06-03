@@ -2,8 +2,11 @@
 from datetime import date
 
 from sqlalchemy.orm import Session
+from sqlalchemy.orm import joinedload
 
 from app.models.empresas.historial_suscripcion import HistorialSuscripcion
+from app.models.empresas.plan import Plan
+from app.models.empresas.plan_modulo import PlanModulo
 
 
 class SuscripcionRepository:
@@ -47,6 +50,11 @@ class SuscripcionRepository:
         hoy = date.today()
         return (
             db.query(HistorialSuscripcion)
+            .options(
+                joinedload(HistorialSuscripcion.plan)
+                .joinedload(Plan.planes_modulo)
+                .joinedload(PlanModulo.modulo)
+            )
             .filter(
                 HistorialSuscripcion.id_empresa == id_empresa,
                 HistorialSuscripcion.estado == "activo",
