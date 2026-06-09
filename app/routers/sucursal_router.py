@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+from html import escape
+
 from fastapi import APIRouter, Depends, HTTPException
 import logging
 from fastapi.responses import HTMLResponse
@@ -83,6 +85,40 @@ def _render_client_invitation_html(
     """
 
 
+def _render_employee_invitation_html(
+    mensaje: str,
+    empresa_nombre: str,
+    es_error: bool = False,
+) -> str:
+    color_principal = "#d9534f" if es_error else "#007bff"
+    titulo = "Invitacion de empleado" if not es_error else "No se pudo completar la invitacion"
+    badge = "!" if es_error else "OK"
+    mensaje_seguro = escape(mensaje)
+    empresa_nombre_seguro = escape(empresa_nombre)
+    empresa_bloque = (
+        f'<p style="color: #666; font-size: 14px; line-height: 1.7; margin: 0 0 24px 0;">Empresa: <strong>{empresa_nombre_seguro}</strong></p>'
+        if empresa_nombre_seguro
+        else ""
+    )
+    return f"""
+    <html>
+        <body style="font-family: Arial, sans-serif; background-color: #f4f4f4; padding: 20px; margin: 0;">
+            <div style="background-color: white; padding: 24px; border-radius: 8px; max-width: 640px; margin: 0 auto; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);">
+                <div style="width: 56px; height: 56px; border-radius: 50%; background-color: {color_principal}; color: white; display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: 700; margin-bottom: 18px;">
+                    {badge}
+                </div>
+                <h2 style="color: #333; margin: 0 0 12px 0;">{titulo}</h2>
+                <p style="color: #666; font-size: 16px; line-height: 1.7; margin: 0 0 12px 0;">{mensaje_seguro}</p>
+                {empresa_bloque}
+                <div style="padding-top: 12px; border-top: 1px solid #eee; color: #999; font-size: 12px; line-height: 1.6;">
+                    Esta confirmacion fue generada automaticamente al abrir el enlace de invitacion.
+                </div>
+            </div>
+        </body>
+    </html>
+    """
+
+
 @empresa_router.post("/{id_empresa}/sucursales", response_model=SucursalResponse)
 def crear_sucursal(
     id_empresa: int,
@@ -112,7 +148,8 @@ def crear_sucursal(
     except LookupError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except ValueError as e:
-        raise HTTPException(status_code=401, detail=str(e))
+        status_code = 400 if "limite" in str(e).lower() else 401
+        raise HTTPException(status_code=status_code, detail=str(e))
     except Exception:
         raise HTTPException(status_code=500, detail="Error al crear la sucursal.")
 
@@ -552,7 +589,8 @@ def actualizar_sucursal(
     except LookupError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except ValueError as e:
-        raise HTTPException(status_code=401, detail=str(e))
+        status_code = 400 if "limite" in str(e).lower() else 401
+        raise HTTPException(status_code=status_code, detail=str(e))
     except Exception:
         raise HTTPException(status_code=500, detail="Error al actualizar la sucursal.")
 
@@ -586,16 +624,36 @@ def aceptar_invitacion_empleado(
     db: Session = Depends(get_db),
 ):
     try:
-        return SucursalService.aceptar_invitacion_empleado(
+        resultado = SucursalService.aceptar_invitacion_empleado(
             db=db,
             token=token,
         )
+        html = _render_employee_invitation_html(
+            mensaje=resultado["mensaje"],
+            empresa_nombre=resultado["empresa"],
+        )
+        return HTMLResponse(content=html, status_code=200)
     except LookupError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        html = _render_employee_invitation_html(
+            mensaje=str(e),
+            empresa_nombre="",
+            es_error=True,
+        )
+        return HTMLResponse(content=html, status_code=404)
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        html = _render_employee_invitation_html(
+            mensaje=str(e),
+            empresa_nombre="",
+            es_error=True,
+        )
+        return HTMLResponse(content=html, status_code=400)
     except Exception:
-        raise HTTPException(status_code=500, detail="Error al aceptar la invitacion.")
+        html = _render_employee_invitation_html(
+            mensaje="Error al aceptar la invitacion.",
+            empresa_nombre="",
+            es_error=True,
+        )
+        return HTMLResponse(content=html, status_code=500)
 
 
 @invitacion_router.get("/cliente/aceptar/{id_empresa}/{id_usuario}")

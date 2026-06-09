@@ -8,6 +8,8 @@ __pycache__/
 app/media/**
 !app/media/.gitkeep
 
+/Bitacora/
+
 # Credentials and secrets - do not commit
 # Firebase / service account keys
 serviceAccount*.json

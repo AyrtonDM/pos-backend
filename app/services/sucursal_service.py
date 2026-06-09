@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
+import json
 import os
+import re
 from datetime import date
 from datetime import datetime
 from datetime import timedelta
@@ -16,6 +18,7 @@ from app.core.security import JWT_SECRET_KEY
 from app.models.usuarios import Usuario
 from app.repositories.empresa_repository import EmpresaRepository
 from app.repositories.rol_repository import RolRepository
+from app.repositories.suscripcion_repository import SuscripcionRepository
 from app.repositories.sucursal_repository import SucursalRepository
 from app.repositories.usuario_repository import UsuarioRepository
 from app.repositories.cliente_repository import ClienteRepository
@@ -27,6 +30,142 @@ from app.utils.email_service import (
 
 
 class SucursalService:
+    LIMITE_ILIMITADO = "sin limite"
+
+    @staticmethod
+    def _normalizar_limite_plan(valor, clave: str) -> int | None:
+        if valor is None:
+            return None
+
+        if isinstance(valor, int):
+            return valor
+
+        texto = str(valor).strip().lower()
+        texto = texto.replace("í", "i")
+        if texto in {
+            SucursalService.LIMITE_ILIMITADO,
+            "sin límites",
+            "sin limites",
+            "ilimitado",
+            "ilimitados",
+            "unlimited",
+        }:
+            return None
+
+        try:
+            return int(texto)
+        except ValueError as exc:
+            raise ValueError(f"La configuracion {clave} del plan no es valida.") from exc
+
+    @staticmethod
+    def _obtener_limite_desde_configuracion(
+        configuracion: str | None,
+        clave: str,
+    ) -> int | None:
+        if not configuracion:
+            return None
+
+        try:
+            datos = json.loads(configuracion)
+        except json.JSONDecodeError:
+            coincidencia = re.search(
+                rf"{re.escape(clave)}\s*[:=]\s*(.*?)(?=\s+\w+\s*[:=]|[,;\r\n]|$)",
+                configuracion,
+                flags=re.IGNORECASE,
+            )
+            if coincidencia is None:
+                return None
+            return SucursalService._normalizar_limite_plan(coincidencia.group(1), clave)
+
+        if isinstance(datos, dict) and clave in datos:
+            return SucursalService._normalizar_limite_plan(datos[clave], clave)
+
+        if isinstance(datos, str):
+            coincidencia = re.search(
+                rf"{re.escape(clave)}\s*[:=]\s*(.*?)(?=\s+\w+\s*[:=]|[,;\r\n]|$)",
+                datos,
+                flags=re.IGNORECASE,
+            )
+            if coincidencia is not None:
+                return SucursalService._normalizar_limite_plan(coincidencia.group(1), clave)
+
+        return None
+
+    @staticmethod
+    def _obtener_limite_plan(db: Session, id_empresa: int, clave: str) -> int | None:
+        suscripcion = SuscripcionRepository.obtener_suscripcion_activa(
+            db=db,
+            id_empresa=id_empresa,
+        )
+        if suscripcion is None or suscripcion.plan is None:
+            raise LookupError("La empresa no tiene una suscripcion activa.")
+
+        for plan_modulo in suscripcion.plan.planes_modulo:
+            limite = SucursalService._obtener_limite_desde_configuracion(
+                plan_modulo.configuracion,
+                clave,
+            )
+            if limite is not None:
+                return limite
+
+            if plan_modulo.configuracion:
+                texto = str(plan_modulo.configuracion).lower().replace("í", "i")
+                if clave in texto and SucursalService.LIMITE_ILIMITADO in texto:
+                    return None
+
+        return None
+
+    @staticmethod
+    def _validar_limite_usuarios_plan(
+        db: Session,
+        id_empresa: int,
+        id_usuario_invitado: int,
+    ) -> None:
+        usuario_rol_existente = EmpresaRepository.obtener_usuario_rol_activo_distinto_cliente(
+            db=db,
+            id_usuario=id_usuario_invitado,
+            id_empresa=id_empresa,
+        )
+        if usuario_rol_existente is not None:
+            return
+
+        max_usuarios = SucursalService._obtener_limite_plan(
+            db=db,
+            id_empresa=id_empresa,
+            clave="max_usuarios",
+        )
+        if max_usuarios is None:
+            return
+
+        usuarios_actuales = EmpresaRepository.contar_usuarios_activos_por_empresa_excluyendo_roles(
+            db=db,
+            id_empresa=id_empresa,
+            roles_excluidos=["CLIENTE"],
+        )
+        if usuarios_actuales >= max_usuarios:
+            raise ValueError(
+                "La empresa alcanzo el limite de usuarios permitido por su plan."
+            )
+
+    @staticmethod
+    def _validar_limite_sucursales_plan(db: Session, id_empresa: int) -> None:
+        max_sucursales = SucursalService._obtener_limite_plan(
+            db=db,
+            id_empresa=id_empresa,
+            clave="max_sucursales",
+        )
+        if max_sucursales is None:
+            return
+
+        sucursales_actuales = SucursalRepository.contar_sucursales_activas_por_empresa(
+            db=db,
+            id_empresa=id_empresa,
+        )
+        if sucursales_actuales >= max_sucursales:
+            raise ValueError(
+                "La empresa alcanzo el limite de sucursales permitido por su plan."
+            )
+
     @staticmethod
     def _crear_token_invitacion_empleado(
         id_empresa: int,
@@ -91,6 +230,7 @@ class SucursalService:
         ciudad: str,
     ):
         SucursalService._validar_empresa_del_usuario(db, current_user, id_empresa)
+        SucursalService._validar_limite_sucursales_plan(db=db, id_empresa=id_empresa)
 
         try:
             sucursal = SucursalRepository.crear_sucursal(
@@ -210,6 +350,12 @@ class SucursalService:
             id_empresa=sucursal.id_empresa,
         )
 
+        if not sucursal.activo and activo:
+            SucursalService._validar_limite_sucursales_plan(
+                db=db,
+                id_empresa=sucursal.id_empresa,
+            )
+
         return SucursalRepository.actualizar_sucursal(
             db=db,
             sucursal=sucursal,
@@ -261,6 +407,12 @@ class SucursalService:
             raise LookupError("Rol no encontrado o inactivo.")
         if rol.id_empresa is not None and rol.id_empresa != id_empresa:
             raise ValueError("El rol no pertenece a esta empresa.")
+        if rol.nombre != "CLIENTE":
+            SucursalService._validar_limite_usuarios_plan(
+                db=db,
+                id_empresa=id_empresa,
+                id_usuario_invitado=usuario_invitado.id_usuario,
+            )
 
         base_url = obtener_app_base_url()
         token = SucursalService._crear_token_invitacion_empleado(
@@ -384,6 +536,12 @@ class SucursalService:
             raise LookupError("Rol no encontrado o inactivo.")
         if rol.id_empresa is not None and rol.id_empresa != id_empresa:
             raise ValueError("El rol no pertenece a esta empresa.")
+        if rol.nombre != "CLIENTE":
+            SucursalService._validar_limite_usuarios_plan(
+                db=db,
+                id_empresa=id_empresa,
+                id_usuario_invitado=id_usuario,
+            )
 
         sucursales = []
         for id_sucursal in list(dict.fromkeys(id_sucursales)):
