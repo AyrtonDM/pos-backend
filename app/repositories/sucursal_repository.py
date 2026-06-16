@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.models.empresas import Sucursal
@@ -17,6 +18,18 @@ class SucursalRepository:
     @staticmethod
     def obtener_sucursales_por_empresa(db: Session, id_empresa: int) -> list[Sucursal]:
         return db.query(Sucursal).filter(Sucursal.id_empresa == id_empresa).all()
+
+    @staticmethod
+    def contar_sucursales_activas_por_empresa(db: Session, id_empresa: int) -> int:
+        return (
+            db.query(func.count(Sucursal.id_sucursal))
+            .filter(
+                Sucursal.id_empresa == id_empresa,
+                Sucursal.activo.is_(True),
+            )
+            .scalar()
+            or 0
+        )
 
     @staticmethod
     def obtener_sucursales_por_empresa_y_usuario(

@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from sqlalchemy.orm import joinedload
 
@@ -218,6 +219,24 @@ class EmpresaRepository:
                 UsuarioRol.id_usuario_rol.asc(),
             )
             .all()
+        )
+
+    @staticmethod
+    def contar_usuarios_activos_por_empresa_excluyendo_roles(
+        db: Session,
+        id_empresa: int,
+        roles_excluidos: list[str],
+    ) -> int:
+        return (
+            db.query(func.count(func.distinct(UsuarioRol.id_usuario)))
+            .join(Rol, Rol.id_rol == UsuarioRol.id_rol)
+            .filter(
+                UsuarioRol.id_empresa == id_empresa,
+                UsuarioRol.activo.is_(True),
+                Rol.nombre.notin_(roles_excluidos),
+            )
+            .scalar()
+            or 0
         )
 
     @staticmethod

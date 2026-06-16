@@ -3,6 +3,7 @@ from datetime import date
 
 from sqlalchemy.orm import Session
 from sqlalchemy.orm import joinedload
+from sqlalchemy import or_
 
 from app.models.empresas.historial_suscripcion import HistorialSuscripcion
 from app.models.empresas.plan import Plan
@@ -58,7 +59,10 @@ class SuscripcionRepository:
             .filter(
                 HistorialSuscripcion.id_empresa == id_empresa,
                 HistorialSuscripcion.estado == "activo",
-                HistorialSuscripcion.fecha_fin >= hoy,
+                or_(
+                    HistorialSuscripcion.fecha_fin.is_(None),
+                    HistorialSuscripcion.fecha_fin >= hoy,
+                ),
             )
             .order_by(HistorialSuscripcion.fecha_fin.desc())
             .first()
