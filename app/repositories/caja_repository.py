@@ -57,7 +57,12 @@ class CajaRepository:
 
     @staticmethod
     def obtener_caja_sesion_por_id(db: Session, id_caja_sesion: int) -> CajaSesion | None:
-        return db.query(CajaSesion).filter(CajaSesion.id_caja_sesion == id_caja_sesion).first()
+        return (
+            db.query(CajaSesion)
+            .options(joinedload(CajaSesion.caja).joinedload(Caja.sucursal))
+            .filter(CajaSesion.id_caja_sesion == id_caja_sesion)
+            .first()
+        )
 
     @staticmethod
     def obtener_movimientos_por_caja_sesion(

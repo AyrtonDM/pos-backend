@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
 from app.core.database import SessionLocal
@@ -18,8 +19,17 @@ def get_db():
     db = SessionLocal()
     try:
         yield db
+    except Exception:
+        try:
+            db.rollback()
+        except OperationalError:
+            db.invalidate()
+        raise
     finally:
-        db.close()
+        try:
+            db.close()
+        except OperationalError:
+            db.invalidate()
 
 
 @venta_router.get("/tipos-venta", response_model=list[TipoVentaResponse])

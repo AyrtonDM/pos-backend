@@ -2,12 +2,14 @@ from datetime import datetime
 from decimal import Decimal
 
 from fastapi import HTTPException
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
 from app.repositories.venta_repository import VentaRepository
 from app.repositories.producto_repository import ProductoRepository
 from app.repositories.caja_repository import CajaRepository
-from app.models.ventas import MetodoPago
+from app.repositories.cliente_repository import ClienteRepository
+from app.models.ventas import MetodoPago, TipoVenta
 from app.services.inventario_service import InventarioService
 from app.schemas.inventario_schema import MovimientoInventarioCreate
 from app.repositories.movimiento_caja_repository import MovimientoCajaRepository
@@ -37,15 +39,54 @@ class VentaService:
             raise HTTPException(status_code=403, detail="La caja sesion no pertenece a la empresa del usuario.")
 
         try:
-            metodo_pago = None
-            if payload.id_metodo_pago is not None:
+            tipo_venta_payload = (
+                db.query(TipoVenta)
+                .filter(TipoVenta.id_tipo_venta == payload.id_tipo_venta)
+                .first()
+            )
+            if tipo_venta_payload is None:
+                raise HTTPException(status_code=404, detail="Tipo de venta no encontrado.")
+
+            pagos_payload = [
+                {"id_metodo_pago": pago.id_metodo_pago, "monto": pago.monto}
+                for pago in (payload.pagos or [])
+            ]
+            if not pagos_payload and payload.id_metodo_pago is not None:
+                pagos_payload = [{"id_metodo_pago": payload.id_metodo_pago, "monto": payload.total}]
+
+            ids_metodos_pago = [pago["id_metodo_pago"] for pago in pagos_payload]
+            if len(ids_metodos_pago) != len(set(ids_metodos_pago)):
+                raise HTTPException(status_code=400, detail="No se puede repetir el mismo metodo de pago en una venta.")
+
+            total_pagado = Decimal("0.00")
+            for pago in pagos_payload:
+                if pago["id_metodo_pago"] <= 0:
+                    raise HTTPException(status_code=400, detail="Metodo de pago invalido.")
+                if pago["monto"] <= 0:
+                    raise HTTPException(status_code=400, detail="El monto de cada pago debe ser mayor a cero.")
+
                 metodo_pago = (
                     db.query(MetodoPago)
-                    .filter(MetodoPago.id_metodo_pago == payload.id_metodo_pago)
+                    .filter(MetodoPago.id_metodo_pago == pago["id_metodo_pago"])
                     .first()
                 )
                 if metodo_pago is None:
-                    raise HTTPException(status_code=404, detail="Metodo de pago no encontrado.")
+                    raise HTTPException(
+                        status_code=404,
+                        detail=f"Metodo de pago {pago['id_metodo_pago']} no encontrado.",
+                    )
+                total_pagado += pago["monto"]
+
+            if pagos_payload and total_pagado != payload.total:
+                raise HTTPException(status_code=400, detail="La suma de los pagos debe ser igual al total de la venta.")
+
+            id_cliente = payload.id_cliente
+            if id_cliente is not None:
+                if id_cliente <= 0:
+                    raise HTTPException(status_code=400, detail="Cliente invalido. Envie null si la venta no tiene cliente.")
+                cliente = ClienteRepository.obtener_cliente_por_id(db=db, id_cliente=id_cliente)
+                if cliente is None:
+                    raise HTTPException(status_code=404, detail="Cliente no encontrado.")
 
             # Normalizar el estado a los valores permitidos por la DB
             estado_input = getattr(payload, "estado", None)
@@ -64,11 +105,13 @@ class VentaService:
                     estado_norm = None
             if not estado_norm:
                 estado_norm = "PENDIENTE_COBRO"
+            if pagos_payload:
+                estado_norm = "PAGADA"
 
             # Crear venta
             venta_datos = {
                 "id_tipo_venta": payload.id_tipo_venta,
-                "id_cliente": payload.id_cliente,
+                "id_cliente": id_cliente,
                 "id_caja_sesion": id_caja_sesion,
                 "id_usuario": current_user.id_usuario,
                 "subtotal": payload.subtotal,
@@ -81,11 +124,16 @@ class VentaService:
 
             detalles_creados = []
 
-            # Obtener id_tipo_movimiento para "Venta" (reducción de stock)
+            # Obtener id_tipo_movimiento para "Venta" (reducciÃ³n de stock)
             tipo_venta: TipoMovimiento | None = (
                 db.query(TipoMovimiento).filter(TipoMovimiento.nombre == "Venta").first()
             )
-            id_tipo_movimiento_venta = tipo_venta.id_tipo_movimiento if tipo_venta else 3
+            if tipo_venta is None:
+                raise HTTPException(
+                    status_code=500,
+                    detail='Tipo de movimiento de inventario "Venta" no configurado.',
+                )
+            id_tipo_movimiento_venta = tipo_venta.id_tipo_movimiento
 
             # Procesar cada detalle: insert detalle + usar InventarioService.crear_movimiento
             for d in payload.detalles:
@@ -121,34 +169,35 @@ class VentaService:
                             id_empresa=caja_sesion.caja.sucursal.id_empresa,
                             id_sucursal=caja_sesion.caja.id_sucursal,
                             payload=movimiento_payload,
+                            commit=False,
                         )
                 except LookupError as le:
                     raise HTTPException(status_code=404, detail=str(le))
                 except ValueError as ve:
                     raise HTTPException(status_code=400, detail=str(ve))
 
-            # Crear movimiento de caja asociado a la venta
-            movimiento_caja_datos = {
-                "id_caja_sesion": id_caja_sesion,
-                "id_tipo_movimiento_caja": 2,  # INGRESO (seed default)
-                "monto": payload.total,
-                "concepto": f"Venta {venta.id_venta}",
-                "id_metodo_pago": payload.id_metodo_pago,
-                "id_usuario": current_user.id_usuario,
-            }
-            movimiento_caja = MovimientoCajaRepository.crear_movimiento(db, movimiento_caja_datos)
+            movimientos_caja = []
+            ventas_pago = []
+            for pago in pagos_payload:
+                movimiento_caja_datos = {
+                    "id_caja_sesion": id_caja_sesion,
+                    "id_tipo_movimiento_caja": 2,  # INGRESO (seed default)
+                    "monto": pago["monto"],
+                    "concepto": f"Venta {venta.id_venta}",
+                    "id_metodo_pago": pago["id_metodo_pago"],
+                    "id_usuario": current_user.id_usuario,
+                }
+                movimientos_caja.append(MovimientoCajaRepository.crear_movimiento(db, movimiento_caja_datos))
 
-            venta_pago = None
-            if payload.id_metodo_pago is not None:
-                venta_pago = VentaRepository.crear_venta_pago(
+                ventas_pago.append(VentaRepository.crear_venta_pago(
                     db=db,
                     datos={
                         "id_venta": venta.id_venta,
-                        "id_metodo_pago": payload.id_metodo_pago,
-                        "monto": payload.total,
+                        "id_metodo_pago": pago["id_metodo_pago"],
+                        "monto": pago["monto"],
                         "fecha": datetime.utcnow(),
                     },
-                )
+                ))
 
             # Commit transaction una vez todo creado
             db.commit()
@@ -161,15 +210,21 @@ class VentaService:
             return {
                 "venta": venta,
                 "detalles": detalles_creados,
-                "movimiento_caja": movimiento_caja,
-                "venta_pago": venta_pago,
+                "movimientos_caja": movimientos_caja,
+                "ventas_pago": ventas_pago,
             }
 
         except HTTPException:
-            db.rollback()
+            try:
+                db.rollback()
+            except OperationalError:
+                db.invalidate()
             raise
         except Exception as e:
-            db.rollback()
+            try:
+                db.rollback()
+            except OperationalError:
+                db.invalidate()
             raise HTTPException(status_code=500, detail=str(e))
 
     @staticmethod

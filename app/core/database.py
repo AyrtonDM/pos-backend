@@ -21,10 +21,16 @@ engine = create_engine(
     DATABASE_URL,
     echo=False,
     pool_pre_ping=True,
-    pool_recycle=300,
+    pool_recycle=180,
     pool_size=5,
     max_overflow=10,
     pool_timeout=30,
-    connect_args={"connect_timeout": 10},
+    connect_args={
+        "connect_timeout": 10,
+        "keepalives": 1,
+        "keepalives_idle": 30,
+        "keepalives_interval": 10,
+        "keepalives_count": 5,
+    },
 )
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

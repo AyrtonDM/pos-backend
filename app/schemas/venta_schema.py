@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from datetime import datetime
 from decimal import Decimal
 from typing import List
@@ -32,10 +32,16 @@ class DetalleVentaCreate(BaseModel):
     descripcion: str | None = None
 
 
+class VentaPagoCreate(BaseModel):
+    id_metodo_pago: int
+    monto: Decimal
+
+
 class VentaCreate(BaseModel):
     id_tipo_venta: int
     id_cliente: int | None = None
     id_metodo_pago: int | None = None
+    pagos: List[VentaPagoCreate] | None = None
     subtotal: Decimal
     descuento_total: Decimal | None = Decimal("0.00")
     total: Decimal
@@ -45,6 +51,16 @@ class VentaCreate(BaseModel):
 
 class DetalleVentaResponse(DetalleVentaCreate):
     id_detalle_venta: int
+
+    class Config:
+        from_attributes = True
+
+
+class VentaPagoResponse(BaseModel):
+    id_metodo_pago: int
+    monto: Decimal
+    fecha: datetime
+    metodo_pago: MetodoPagoResponse | None = None
 
     class Config:
         from_attributes = True
@@ -62,6 +78,7 @@ class VentaResponse(BaseModel):
     id_metodo_pago: int | None = None
     metodo_pago: MetodoPagoResponse | None = None
     detalles: List[DetalleVentaResponse]
+    pagos: List[VentaPagoResponse] = Field(default_factory=list)
 
     class Config:
         from_attributes = True
