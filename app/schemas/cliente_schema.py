@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 class CategoriaClienteBase(BaseModel):
     nombre: str = Field(max_length=150)
     descripcion: str | None = None
-    permite_credito: bool = True
+    plazo_credito: int = 0
     descuento_base: Decimal = Field(default=Decimal("0.00"), decimal_places=2)
     limite_credito: Decimal = Field(default=Decimal("0.00"), decimal_places=2)
 
@@ -19,7 +19,7 @@ class CategoriaClienteCreate(CategoriaClienteBase):
 class CategoriaClienteUpdate(BaseModel):
     nombre: str | None = None
     descripcion: str | None = None
-    permite_credito: bool | None = None
+    plazo_credito: int | None = None
     descuento_base: Decimal | None = None
     limite_credito: Decimal | None = None
     activo: bool | None = None
@@ -30,7 +30,7 @@ class CategoriaClienteResponse(BaseModel):
     id_empresa: int
     nombre: str
     descripcion: str | None
-    permite_credito: bool
+    plazo_credito: int
     descuento_base: Decimal
     limite_credito: Decimal
     activo: bool

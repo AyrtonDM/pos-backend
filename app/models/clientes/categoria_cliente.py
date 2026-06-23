@@ -14,7 +14,7 @@ class CategoriaCliente(Base):
     id_empresa = Column(ForeignKey("empresa.id_empresa"), nullable=False, index=True)
     nombre = Column(String(150), nullable=False, index=True)
     descripcion = Column(Text, nullable=True)
-    permite_credito = Column(Boolean, default=True, nullable=False)
+    plazo_credito = Column(Integer, default=0, nullable=False)
     descuento_base = Column(Numeric(5, 2), default=Decimal("0.00"), nullable=False)
     limite_credito = Column(Numeric(12, 2), default=Decimal("0.00"), nullable=False)
     activo = Column(Boolean, default=True, nullable=False)

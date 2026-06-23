@@ -42,7 +42,7 @@ def create_category(
             id_empresa=id_empresa,
             nombre=datos.nombre,
             descripcion=datos.descripcion,
-            permite_credito=datos.permite_credito,
+            plazo_credito=datos.plazo_credito,
             descuento_base=datos.descuento_base,
             limite_credito=datos.limite_credito,
         )
@@ -112,7 +112,7 @@ def update_category(
             id_categoria_cliente=id_categoria_cliente,
             nombre=datos.nombre,
             descripcion=datos.descripcion,
-            permite_credito=datos.permite_credito,
+            plazo_credito=datos.plazo_credito,
             descuento_base=datos.descuento_base,
             limite_credito=datos.limite_credito,
             activo=datos.activo,
