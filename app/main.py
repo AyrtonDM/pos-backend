@@ -89,7 +89,7 @@ def on_startup() -> None:
     apply_schema_updates()
     db = SessionLocal()
     try:
-        run_seeds(db)
+        # run_seeds(db)
         InventarioService.sincronizar_stocks_iniciales(db=db)
         db.commit()
     except Exception:

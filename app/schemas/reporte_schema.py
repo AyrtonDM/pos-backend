@@ -24,6 +24,39 @@ class SolicitudReporte(BaseModel):
     prompt: str
 
 
+class ReporteProductosSucursalRequest(BaseModel):
+    id_sucursal: int = Field(gt=0)
+
+
+class ProductoReporteAbastecimiento(BaseModel):
+    id_producto: int
+    producto: str
+    vendido_ultimos_30_dias: int
+    stock_actual: int
+    promedio_diario: float
+    prediccion_proximos_30_dias: int
+    recomendado_comprar: int
+
+
+class RecomendacionProductosRequest(BaseModel):
+    id_productos: list[int] = Field(min_length=1, max_length=20)
+
+
+class ProductoRecomendadoIA(BaseModel):
+    idProducto: int
+    nombre: str
+    unidadMedida: str
+    precio: float
+    stock: int
+    codigo: str
+    codigoBarras: str | None
+
+
+class RecomendacionProductosResponse(BaseModel):
+    productos_analizados: list[int]
+    recomendaciones: list[ProductoRecomendadoIA]
+
+
 class EspecificacionReporte(BaseModel):
     identificador_plantilla: str
     titulo: str

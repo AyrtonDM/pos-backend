@@ -17,5 +17,14 @@ DATABASE_URL = f"postgresql+psycopg2://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_POR
 Base = declarative_base()
 
 
-engine = create_engine(DATABASE_URL, echo=False)
+engine = create_engine(
+    DATABASE_URL,
+    echo=False,
+    pool_pre_ping=True,
+    pool_recycle=300,
+    pool_size=5,
+    max_overflow=10,
+    pool_timeout=30,
+    connect_args={"connect_timeout": 10},
+)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
