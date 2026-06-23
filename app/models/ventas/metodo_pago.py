@@ -14,3 +14,4 @@ class MetodoPago(Base):
     ventas_pago = relationship("VentaPago", back_populates="metodo_pago")
     movimientos_caja = relationship("MovimientoCaja", back_populates="metodo_pago")
     cierres_caja = relationship("CajaCierreDetalle", back_populates="metodo_pago")
+    pagos_credito = relationship("PagoCredito", back_populates="metodo_pago")
