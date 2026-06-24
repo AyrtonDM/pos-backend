@@ -8,6 +8,13 @@ __pycache__/
 app/media/**
 !app/media/.gitkeep
 
+# Facturas generadas
+app/XMLS/**
+!app/XMLS/.gitkeep
+!app/XMLS/PDFS/
+app/XMLS/PDFS/**
+!app/XMLS/PDFS/.gitkeep
+
 /Bitacora/
 
 # Credentials and secrets - do not commit

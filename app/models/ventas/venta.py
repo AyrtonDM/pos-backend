@@ -29,6 +29,12 @@ class Venta(Base):
     pagos = relationship("VentaPago", back_populates="venta", cascade="all, delete-orphan")
     detalles = relationship("DetalleVenta", back_populates="venta", cascade="all, delete-orphan")
     cuentas_por_cobrar = relationship("CuentaPorCobrar", back_populates="venta", cascade="all, delete-orphan")
+    factura = relationship(
+        "Factura",
+        back_populates="venta",
+        uselist=False,
+        cascade="all, delete-orphan",
+    )
 
     @property
     def pago_principal(self):

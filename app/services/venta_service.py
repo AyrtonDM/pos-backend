@@ -16,6 +16,7 @@ from app.repositories.movimiento_caja_repository import MovimientoCajaRepository
 from app.repositories.empresa_repository import EmpresaRepository
 from app.models.inventario.tipo_movimiento import TipoMovimiento
 from app.models.empresas import CajaSesion, TipoMovimientoCaja
+from app.services.factura_service import FacturaService
 
 
 class VentaService:
@@ -97,6 +98,11 @@ class VentaService:
                     raise HTTPException(status_code=400, detail="Una venta a credito debe tener cliente.")
                 if cliente.categoria_cliente is None:
                     raise HTTPException(status_code=400, detail="El cliente no tiene categoria asociada para calcular el plazo de credito.")
+            if payload.factura_linea and cliente is None:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Para generar factura en linea debe seleccionar un cliente.",
+                )
 
             # Normalizar el estado a los valores permitidos por la DB
             estado_input = getattr(payload, "estado", None)
@@ -135,6 +141,7 @@ class VentaService:
             venta = VentaRepository.crear_venta(db, venta_datos)
 
             detalles_creados = []
+            detalles_factura = []
 
             # Obtener id_tipo_movimiento para "Venta" (reducción de stock)
             tipo_venta: TipoMovimiento | None = (
@@ -166,6 +173,14 @@ class VentaService:
                 }
                 detalle = VentaRepository.crear_detalle(db, detalle_datos)
                 detalles_creados.append(detalle)
+                detalles_factura.append(
+                    {
+                        "id_producto": d.id_producto,
+                        "producto": producto.nombre,
+                        "cantidad": d.cantidad,
+                        "subtotal": d.subtotal,
+                    }
+                )
 
                 # Usar InventarioService para crear movimiento y actualizar stock
                 movimiento_payload = MovimientoInventarioCreate(
@@ -226,6 +241,18 @@ class VentaService:
                     },
                 ))
 
+            factura = None
+            ruta_pdf_factura = None
+            if payload.factura_linea:
+                empresa = caja_sesion.caja.sucursal.empresa
+                factura, ruta_pdf_factura = FacturaService.crear_factura(
+                    db=db,
+                    venta=venta,
+                    cliente=cliente,
+                    empresa=empresa,
+                    detalles=detalles_factura,
+                )
+
             # Commit transaction una vez todo creado
             db.commit()
 
@@ -234,12 +261,23 @@ class VentaService:
             if venta is None:
                 raise HTTPException(status_code=500, detail="No se pudo recuperar la venta creada.")
 
+            factura_email_enviado = None
+            if factura is not None and ruta_pdf_factura is not None:
+                db.refresh(factura)
+                factura_email_enviado = FacturaService.enviar_factura(
+                    cliente=cliente,
+                    factura=factura,
+                    ruta_pdf=ruta_pdf_factura,
+                )
+
             return {
                 "venta": venta,
                 "detalles": detalles_creados,
                 "movimientos_caja": movimientos_caja,
                 "ventas_pago": ventas_pago,
                 "cuenta_por_cobrar": cuenta_por_cobrar,
+                "factura": factura,
+                "factura_email_enviado": factura_email_enviado,
             }
 
         except HTTPException:

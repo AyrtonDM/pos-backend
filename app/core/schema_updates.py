@@ -8,6 +8,22 @@ def apply_schema_updates() -> None:
         connection.execute(
             text(
                 """
+                ALTER TABLE factura
+                ADD COLUMN IF NOT EXISTS iva NUMERIC(12, 2) NOT NULL DEFAULT 0.00
+                """
+            )
+        )
+        connection.execute(
+            text(
+                """
+                ALTER TABLE factura
+                ADD COLUMN IF NOT EXISTS pdf_generado TEXT NOT NULL DEFAULT ''
+                """
+            )
+        )
+        connection.execute(
+            text(
+                """
                 ALTER TABLE rol
                 ADD COLUMN IF NOT EXISTS tipo VARCHAR(50)
                 """

@@ -53,6 +53,7 @@ class VentaCreate(BaseModel):
     id_tipo_venta: int
     id_cliente: int | None = None
     id_metodo_pago: int | None = None
+    factura_linea: bool = False
     pagos: List[VentaPagoCreate] | None = None
     subtotal: Decimal
     descuento_total: Decimal | None = Decimal("0.00")
