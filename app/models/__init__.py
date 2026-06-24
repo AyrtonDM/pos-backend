@@ -19,7 +19,7 @@ from app.models.usuarios.rol import Rol
 from app.models.usuarios.rol_permiso import RolPermiso
 from app.models.usuarios.usuario import Usuario
 from app.models.usuarios.usuario_rol import UsuarioRol
-from app.models.ventas import CuentaPorCobrar, MetodoPago, PagoCredito, TipoVenta, Venta, VentaPago
+from app.models.ventas import CuentaPorCobrar, Factura, MetodoPago, PagoCredito, TipoVenta, Venta, VentaPago
 from app.models.ventas import DetalleVenta
 
 __all__ = [
@@ -55,4 +55,5 @@ __all__ = [
 	"DetalleVenta",
 	"CuentaPorCobrar",
 	"PagoCredito",
+	"Factura",
 ]

@@ -20,7 +20,7 @@ from app.models.empresas import (
 from app.models.inventario import MovimientoInventario, Stock, TipoMovimiento
 from app.models.productos import CategoriaProducto, Producto, SubcategoriaProducto
 from app.models.usuarios import Persona, Rol, Usuario, UsuarioRol, Modulo, Permiso, RolPermiso
-from app.models.ventas import CuentaPorCobrar, MetodoPago, PagoCredito, TipoVenta, Venta, VentaPago
+from app.models.ventas import CuentaPorCobrar, Factura, MetodoPago, PagoCredito, TipoVenta, Venta, VentaPago
 from app.routers.cliente_router import categoria_cliente_router, cliente_router
 from app.routers.empresa_router import router as empresa_router
 from app.routers.auth_router import router as auth_router

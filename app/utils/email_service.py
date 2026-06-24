@@ -1,8 +1,10 @@
 # -*- coding: utf-8 -*-
 import os
 import smtplib
+from email.mime.application import MIMEApplication
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from pathlib import Path
 
 from dotenv import load_dotenv
 
@@ -223,4 +225,41 @@ def send_client_invitation_email(
         return True
     except Exception as e:
         print(f"Error sending client invitation email: {e}")
+        return False
+
+
+def send_invoice_email(
+    email: str,
+    nombre: str,
+    numero_factura: int,
+    pdf_path: Path,
+) -> bool:
+    try:
+        message = MIMEMultipart()
+        message["Subject"] = f"Factura N. {numero_factura} - POS System"
+        message["From"] = MAIL_FROM
+        message["To"] = email
+        message.attach(
+            MIMEText(
+                f"Hola, {nombre}.\nAdjuntamos la factura N. {numero_factura} de tu compra.",
+                "plain",
+            )
+        )
+
+        with pdf_path.open("rb") as archivo:
+            adjunto = MIMEApplication(archivo.read(), _subtype="pdf")
+        adjunto.add_header(
+            "Content-Disposition",
+            "attachment",
+            filename=pdf_path.name,
+        )
+        message.attach(adjunto)
+
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
+            server.starttls()
+            server.login(SMTP_USER, SMTP_PASSWORD)
+            server.send_message(message)
+        return True
+    except Exception as e:
+        print(f"Error sending invoice email: {e}")
         return False
