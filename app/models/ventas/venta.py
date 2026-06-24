@@ -43,3 +43,7 @@ class Venta(Base):
     def metodo_pago(self):
         pago = self.pago_principal
         return pago.metodo_pago if pago else None
+
+    @property
+    def tipo_venta_nombre(self):
+        return self.tipo_venta.nombre if self.tipo_venta else None

@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from decimal import Decimal
 
 from fastapi import HTTPException
@@ -13,8 +13,9 @@ from app.models.ventas import MetodoPago, TipoVenta
 from app.services.inventario_service import InventarioService
 from app.schemas.inventario_schema import MovimientoInventarioCreate
 from app.repositories.movimiento_caja_repository import MovimientoCajaRepository
+from app.repositories.empresa_repository import EmpresaRepository
 from app.models.inventario.tipo_movimiento import TipoMovimiento
-from app.models.empresas import CajaSesion
+from app.models.empresas import CajaSesion, TipoMovimientoCaja
 
 
 class VentaService:
@@ -46,6 +47,7 @@ class VentaService:
             )
             if tipo_venta_payload is None:
                 raise HTTPException(status_code=404, detail="Tipo de venta no encontrado.")
+            es_venta_credito = (tipo_venta_payload.nombre or "").strip().upper() in {"CREDITO", "CRÉDITO"}
 
             pagos_payload = [
                 {"id_metodo_pago": pago.id_metodo_pago, "monto": pago.monto}
@@ -53,6 +55,8 @@ class VentaService:
             ]
             if not pagos_payload and payload.id_metodo_pago is not None:
                 pagos_payload = [{"id_metodo_pago": payload.id_metodo_pago, "monto": payload.total}]
+            if es_venta_credito and pagos_payload:
+                raise HTTPException(status_code=400, detail="Una venta a credito no debe enviar pagos ni metodo de pago.")
 
             ids_metodos_pago = [pago["id_metodo_pago"] for pago in pagos_payload]
             if len(ids_metodos_pago) != len(set(ids_metodos_pago)):
@@ -81,12 +85,18 @@ class VentaService:
                 raise HTTPException(status_code=400, detail="La suma de los pagos debe ser igual al total de la venta.")
 
             id_cliente = payload.id_cliente
+            cliente = None
             if id_cliente is not None:
                 if id_cliente <= 0:
                     raise HTTPException(status_code=400, detail="Cliente invalido. Envie null si la venta no tiene cliente.")
                 cliente = ClienteRepository.obtener_cliente_por_id(db=db, id_cliente=id_cliente)
                 if cliente is None:
                     raise HTTPException(status_code=404, detail="Cliente no encontrado.")
+            if es_venta_credito:
+                if cliente is None:
+                    raise HTTPException(status_code=400, detail="Una venta a credito debe tener cliente.")
+                if cliente.categoria_cliente is None:
+                    raise HTTPException(status_code=400, detail="El cliente no tiene categoria asociada para calcular el plazo de credito.")
 
             # Normalizar el estado a los valores permitidos por la DB
             estado_input = getattr(payload, "estado", None)
@@ -105,7 +115,9 @@ class VentaService:
                     estado_norm = None
             if not estado_norm:
                 estado_norm = "PENDIENTE_COBRO"
-            if pagos_payload:
+            if es_venta_credito:
+                estado_norm = "CREDITO"
+            elif pagos_payload:
                 estado_norm = "PAGADA"
 
             # Crear venta
@@ -178,7 +190,22 @@ class VentaService:
 
             movimientos_caja = []
             ventas_pago = []
-            for pago in pagos_payload:
+            cuenta_por_cobrar = None
+            if es_venta_credito:
+                fecha_inicio = datetime.utcnow()
+                cuenta_por_cobrar = VentaRepository.crear_cuenta_por_cobrar(
+                    db=db,
+                    datos={
+                        "id_venta": venta.id_venta,
+                        "monto_credito": payload.total,
+                        "saldo_pendiente": payload.total,
+                        "fecha_inicio": fecha_inicio,
+                        "fecha_vencimiento": fecha_inicio + timedelta(days=cliente.categoria_cliente.plazo_credito),
+                        "estado": "PENDIENTE",
+                    },
+                )
+
+            for pago in ([] if es_venta_credito else pagos_payload):
                 movimiento_caja_datos = {
                     "id_caja_sesion": id_caja_sesion,
                     "id_tipo_movimiento_caja": 2,  # INGRESO (seed default)
@@ -212,6 +239,7 @@ class VentaService:
                 "detalles": detalles_creados,
                 "movimientos_caja": movimientos_caja,
                 "ventas_pago": ventas_pago,
+                "cuenta_por_cobrar": cuenta_por_cobrar,
             }
 
         except HTTPException:
@@ -248,3 +276,205 @@ class VentaService:
             raise
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
+
+    @staticmethod
+    def obtener_cuentas_por_cobrar_de_cliente(
+        db: Session,
+        current_user,
+        id_empresa: int,
+        id_cliente: int,
+    ) -> list:
+        usuario_rol = EmpresaRepository.obtener_usuario_rol_activo(
+            db=db,
+            id_usuario=current_user.id_usuario,
+            id_empresa=id_empresa,
+        )
+        if usuario_rol is None:
+            raise LookupError("Empresa no encontrada para este usuario.")
+
+        cliente = ClienteRepository.obtener_cliente_por_id(
+            db=db,
+            id_cliente=id_cliente,
+        )
+        if cliente is None:
+            raise LookupError("Cliente no encontrado.")
+
+        empresa_del_cliente = EmpresaRepository.obtener_empresa_por_usuario(
+            db=db,
+            id_usuario=cliente.id_usuario,
+            id_empresa=id_empresa,
+        )
+        if empresa_del_cliente is None:
+            raise LookupError("Cliente no encontrado para esta empresa.")
+
+        rol_operador = EmpresaRepository.obtener_usuario_rol_activo_distinto_cliente(
+            db=db,
+            id_usuario=current_user.id_usuario,
+            id_empresa=id_empresa,
+        )
+        if rol_operador is None and cliente.id_usuario != current_user.id_usuario:
+            raise PermissionError(
+                "No tiene permiso para consultar las cuentas por cobrar de este cliente."
+            )
+
+        return VentaRepository.obtener_cuentas_por_cobrar_por_empresa_y_cliente(
+            db=db,
+            id_empresa=id_empresa,
+            id_cliente=id_cliente,
+        )
+
+    @staticmethod
+    def registrar_pago_cuenta_por_cobrar(
+        db: Session,
+        current_user,
+        id_caja_sesion: int,
+        payload,
+    ) -> dict:
+        caja_sesion = CajaRepository.obtener_caja_sesion_por_id(
+            db=db,
+            id_caja_sesion=id_caja_sesion,
+        )
+        if caja_sesion is None:
+            raise HTTPException(status_code=404, detail="Caja sesion no encontrada.")
+
+        VentaService._validar_caja_sesion_del_usuario(
+            caja_sesion=caja_sesion,
+            current_user=current_user,
+        )
+        if caja_sesion.estado != "Abierto":
+            raise HTTPException(status_code=400, detail="La caja sesion debe estar abierta.")
+
+        try:
+            cuenta = VentaRepository.obtener_cuenta_por_cobrar_para_actualizar(
+                db=db,
+                id_cxc=payload.id_cxc,
+            )
+            if cuenta is None:
+                raise HTTPException(status_code=404, detail="Cuenta por cobrar no encontrada.")
+
+            id_empresa_sesion = caja_sesion.caja.sucursal.id_empresa
+            id_empresa_cuenta = cuenta.venta.caja_sesion.caja.sucursal.id_empresa
+            if id_empresa_cuenta != id_empresa_sesion:
+                raise HTTPException(
+                    status_code=400,
+                    detail="La cuenta por cobrar no pertenece a la empresa de la caja sesion.",
+                )
+
+            saldo_anterior = Decimal(cuenta.saldo_pendiente or 0)
+            if saldo_anterior <= Decimal("0.00") or cuenta.estado == "PAGADA":
+                raise HTTPException(
+                    status_code=400,
+                    detail="La cuenta por cobrar ya se encuentra pagada.",
+                )
+
+            pagos_payload = list(payload.pagos_credito)
+            ids_metodos = [pago.id_metodo_pago for pago in pagos_payload]
+            if len(ids_metodos) != len(set(ids_metodos)):
+                raise HTTPException(
+                    status_code=400,
+                    detail="No se puede repetir el mismo metodo de pago.",
+                )
+
+            metodos_pago = {
+                metodo.id_metodo_pago: metodo
+                for metodo in db.query(MetodoPago)
+                .filter(MetodoPago.id_metodo_pago.in_(ids_metodos))
+                .all()
+            }
+            if len(metodos_pago) != len(ids_metodos):
+                raise HTTPException(
+                    status_code=404,
+                    detail="Uno o mas metodos de pago no fueron encontrados.",
+                )
+
+            metodos_permitidos = {"EFECTIVO", "QR", "TARJETA"}
+            for metodo in metodos_pago.values():
+                if (metodo.nombre or "").strip().upper() not in metodos_permitidos:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=(
+                            f"El metodo de pago {metodo.nombre} no esta permitido para "
+                            "pagos de credito."
+                        ),
+                    )
+
+            total_pagado = sum(
+                (Decimal(pago.monto_pagado) for pago in pagos_payload),
+                Decimal("0.00"),
+            )
+            if total_pagado > saldo_anterior:
+                raise HTTPException(
+                    status_code=400,
+                    detail="El total pagado no puede ser mayor al saldo pendiente.",
+                )
+
+            tipo_ingreso = (
+                db.query(TipoMovimientoCaja)
+                .filter(TipoMovimientoCaja.nombre == "INGRESO")
+                .first()
+            )
+            if tipo_ingreso is None:
+                raise HTTPException(
+                    status_code=500,
+                    detail="Tipo de movimiento de caja INGRESO no configurado.",
+                )
+
+            fecha_pago = datetime.utcnow()
+            pagos_creados = []
+            movimientos_creados = []
+            for pago in pagos_payload:
+                pago_creado = VentaRepository.crear_pago_credito(
+                    db=db,
+                    datos={
+                        "id_cxc": cuenta.id_cxc,
+                        "id_metodo_pago": pago.id_metodo_pago,
+                        "monto_pagado": pago.monto_pagado,
+                        "fecha_pago": fecha_pago,
+                    },
+                )
+                pagos_creados.append(pago_creado)
+
+                movimiento = MovimientoCajaRepository.crear_movimiento(
+                    db=db,
+                    datos={
+                        "id_metodo_pago": pago.id_metodo_pago,
+                        "id_tipo_movimiento_caja": tipo_ingreso.id_tipo_movimiento_caja,
+                        "id_caja_sesion": id_caja_sesion,
+                        "id_usuario": current_user.id_usuario,
+                        "fecha": fecha_pago,
+                        "monto": pago.monto_pagado,
+                        "concepto": f"PAGO_CREDITO CXC {cuenta.id_cxc}",
+                    },
+                )
+                movimientos_creados.append(movimiento)
+
+            cuenta.saldo_pendiente = saldo_anterior - total_pagado
+            if cuenta.saldo_pendiente == Decimal("0.00"):
+                cuenta.estado = "PAGADA"
+            elif cuenta.estado == "PAGADA":
+                cuenta.estado = "PENDIENTE"
+
+            db.commit()
+            db.refresh(cuenta)
+            for pago in pagos_creados:
+                db.refresh(pago)
+            for movimiento in movimientos_creados:
+                db.refresh(movimiento)
+
+            return {
+                "id_cxc": cuenta.id_cxc,
+                "id_caja_sesion": id_caja_sesion,
+                "monto_credito": cuenta.monto_credito,
+                "saldo_anterior": saldo_anterior,
+                "total_pagado": total_pagado,
+                "saldo_pendiente": cuenta.saldo_pendiente,
+                "estado": cuenta.estado,
+                "pagos_credito": pagos_creados,
+                "movimientos_caja": movimientos_creados,
+            }
+        except HTTPException:
+            db.rollback()
+            raise
+        except Exception as exc:
+            db.rollback()
+            raise HTTPException(status_code=500, detail=str(exc)) from exc
