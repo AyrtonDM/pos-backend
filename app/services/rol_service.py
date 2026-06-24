@@ -139,7 +139,9 @@ class RolService:
             )
         except IntegrityError as exc:
             db.rollback()
-            raise ValueError("No se pudo crear el rol. Verifique que el nombre no exista.") from exc
+            raise ValueError(
+                "No se pudo crear el rol. Verifique que el nombre no exista en esta empresa."
+            ) from exc
         except Exception:
             db.rollback()
             raise
