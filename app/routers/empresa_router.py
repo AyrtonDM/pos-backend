@@ -20,12 +20,14 @@ from app.schemas.cliente_schema import (
     ClienteUpdate,
 )
 from app.schemas.venta_schema import CuentaPorCobrarClienteResponse
+from app.schemas.factura_schema import FacturaListadoResponse
 from app.schemas.empresa_schema import EmpresaCreate, EmpresaResponse, EmpresaUpdate
 from app.schemas.permiso_schema import MisPermisosEmpresaResponse, PermisoConRolPermisoResponse, PermisoResponse, PermisosPorModuloResponse
 from app.services.cliente_service import ClienteService
 from app.services.empresa_service import EmpresaService
 from app.services.producto_service import ProductoService
 from app.services.venta_service import VentaService
+from app.services.factura_service import FacturaService
 from app.utils.product_image_storage import save_product_image
 from app.services.bitacora_service import registrar_accion
 from fastapi import File, Form, UploadFile
@@ -40,6 +42,27 @@ def get_db():
         yield db
     finally:
         db.close()
+
+
+@router.get(
+    "/{id_empresa}/facturas",
+    response_model=list[FacturaListadoResponse],
+)
+def listar_facturas_empresa(
+    id_empresa: int,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    try:
+        return FacturaService.listar_facturas_empresa(
+            db=db,
+            current_user=current_user,
+            id_empresa=id_empresa,
+        )
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception:
+        raise HTTPException(status_code=500, detail="Error al listar las facturas.")
 
 
 @router.get("/mis-empresas", response_model=list[EmpresaResponse])

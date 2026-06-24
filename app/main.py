@@ -82,6 +82,11 @@ media_root = Path(__file__).resolve().parent / "media"
 media_root.mkdir(parents=True, exist_ok=True)
 app.mount("/media", StaticFiles(directory=media_root), name="media")
 
+xml_root = Path(__file__).resolve().parent / "XMLS"
+xml_root.mkdir(parents=True, exist_ok=True)
+(xml_root / "PDFS").mkdir(parents=True, exist_ok=True)
+app.mount("/XMLS", StaticFiles(directory=xml_root), name="xmls")
+
 @app.on_event("startup")
 def on_startup() -> None:
     # Importing models above registers all mapped tables in Base.metadata.

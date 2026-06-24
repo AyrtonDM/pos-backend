@@ -5,9 +5,20 @@ from pathlib import Path
 from xml.etree import ElementTree
 
 from PIL import Image, ImageDraw, ImageFont
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload, selectinload
 
+from app.models.clientes import Cliente
+from app.models.empresas import Caja, CajaSesion, Sucursal
+from app.models.ventas import DetalleVenta
 from app.models.ventas import Factura
+from app.models.ventas import Venta
+from app.models.usuarios import Usuario
+from app.repositories.empresa_repository import EmpresaRepository
+from app.schemas.factura_schema import (
+    FacturaDetalleResponse,
+    FacturaListadoResponse,
+    FacturaVentaResponse,
+)
 from app.utils.email_service import send_invoice_email
 
 
@@ -15,6 +26,97 @@ class FacturaService:
     APP_DIR = Path(__file__).resolve().parents[1]
     XML_DIR = APP_DIR / "XMLS"
     PDF_DIR = XML_DIR / "PDFS"
+
+    @staticmethod
+    def listar_facturas_empresa(
+        db: Session,
+        current_user,
+        id_empresa: int,
+    ) -> list[FacturaListadoResponse]:
+        empresa = EmpresaRepository.obtener_empresa_por_usuario(
+            db=db,
+            id_usuario=current_user.id_usuario,
+            id_empresa=id_empresa,
+        )
+        if empresa is None:
+            raise LookupError("Empresa no encontrada para este usuario.")
+
+        facturas = (
+            db.query(Factura)
+            .join(Factura.venta)
+            .join(Venta.caja_sesion)
+            .join(CajaSesion.caja)
+            .join(Caja.sucursal)
+            .options(
+                joinedload(Factura.venta)
+                .joinedload(Venta.cliente)
+                .joinedload(Cliente.usuario)
+                .joinedload(Usuario.persona),
+                joinedload(Factura.venta).joinedload(Venta.tipo_venta),
+                joinedload(Factura.venta)
+                .selectinload(Venta.detalles)
+                .joinedload(DetalleVenta.producto),
+            )
+            .filter(Sucursal.id_empresa == id_empresa)
+            .order_by(Factura.fecha_emision.desc(), Factura.id_factura.desc())
+            .all()
+        )
+
+        resultado = []
+        for factura in facturas:
+            venta = factura.venta
+            cliente = venta.cliente
+            nombre_cliente = (
+                cliente.usuario.persona.nombre_completo
+                if cliente and cliente.usuario and cliente.usuario.persona
+                else "Sin nombre"
+            )
+            detalles = [
+                FacturaDetalleResponse(
+                    id_detalle_venta=detalle.id_detalle_venta,
+                    id_producto=detalle.id_producto,
+                    producto=detalle.producto.nombre if detalle.producto else "Sin producto",
+                    cantidad=detalle.cantidad,
+                    precio_unitario=detalle.precio_unitario,
+                    descuento=detalle.descuento,
+                    subtotal=detalle.subtotal,
+                    total=detalle.total,
+                    descripcion=detalle.descripcion,
+                )
+                for detalle in venta.detalles
+            ]
+            venta_response = FacturaVentaResponse(
+                id_venta=venta.id_venta,
+                id_tipo_venta=venta.id_tipo_venta,
+                id_cliente=venta.id_cliente,
+                id_caja_sesion=venta.id_caja_sesion,
+                id_usuario=venta.id_usuario,
+                subtotal=venta.subtotal,
+                descuento_total=venta.descuento_total,
+                total=venta.total,
+                fecha=venta.fecha,
+                estado=venta.estado,
+                detalles=detalles,
+            )
+            resultado.append(
+                FacturaListadoResponse(
+                    id_factura=factura.id_factura,
+                    id_venta=factura.id_venta,
+                    nit_emisor=factura.nit_emisor,
+                    numero_factura=factura.numero_factura,
+                    fecha_emision=factura.fecha_emision,
+                    nit_cliente=factura.nit_cliente,
+                    nombre_cliente=nombre_cliente,
+                    monto_total=factura.monto_total,
+                    iva=factura.iva,
+                    cufd=factura.cufd,
+                    cuf=factura.cuf,
+                    xml_generado=factura.xml_generado,
+                    pdf_generado=factura.pdf_generado,
+                    venta=venta_response,
+                )
+            )
+        return resultado
 
     @staticmethod
     def _generar_codigo_fiscal() -> str:
