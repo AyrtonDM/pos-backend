@@ -103,39 +103,46 @@ def on_startup() -> None:
         pass
     
     print("\n" + "="*80)
-    print("🚀 INICIANDO SERVIDOR POS BACKEND")
+    print("INICIANDO SERVIDOR POS BACKEND")
     print("="*80)
     
     # Initialize Firebase on startup for diagnostics
-    print("\n📱 Inicializando Firebase...")
+    print("\nInicializando Firebase...")
     from app.core.firebase_admin_client import get_messaging_client
     messaging = get_messaging_client()
     if messaging:
-        print("✅ Firebase inicializado correctamente")
+        print("Firebase inicializado correctamente")
     else:
-        print("⚠️  Firebase NO se pudo inicializar - las notificaciones no funcionarán")
+        print("Firebase NO se pudo inicializar - las notificaciones no funcionaran")
     
     # Importing models above registers all mapped tables in Base.metadata.
-    print("\n🗄️  Inicializando base de datos...")
-    Base.metadata.create_all(bind=engine)
-    apply_schema_updates()
-    print("✅ Base de datos lista")
+    print("\nInicializando base de datos...")
+    try:
+        Base.metadata.create_all(bind=engine)
+    except Exception as e:
+        print(f"Advertencia al crear tablas base: {e}")
+        
+    try:
+        apply_schema_updates()
+        print("Base de datos lista")
+    except Exception as e:
+        print(f"Advertencia al aplicar actualizaciones de esquema: {e}")
     
     db = SessionLocal()
     try:
         # run_seeds(db)
         InventarioService.sincronizar_stocks_iniciales(db=db)
         db.commit()
-        print("✅ Sincronización de stocks completada")
+        print("Sincronizacion de stocks completada")
     except Exception as e:
         db.rollback()
-        print(f"❌ Error en inicialización: {e}")
+        print(f"Error en inicializacion: {e}")
         raise
     finally:
         db.close()
     
     print("\n" + "="*80)
-    print("✅ SERVIDOR LISTO PARA RECIBIR CONEXIONES")
+    print("SERVIDOR LISTO PARA RECIBIR CONEXIONES")
     print("="*80 + "\n")
 
 

@@ -1,396 +1,321 @@
 from sqlalchemy import text
-
 from app.core.database import engine
 
-
 def apply_schema_updates() -> None:
-    with engine.begin() as connection:
-        connection.execute(
-            text(
-                """
-                ALTER TABLE factura
-                ADD COLUMN IF NOT EXISTS iva NUMERIC(12, 2) NOT NULL DEFAULT 0.00
-                """
-            )
-        )
-        connection.execute(
-            text(
-                """
-                ALTER TABLE factura
-                ADD COLUMN IF NOT EXISTS pdf_generado TEXT NOT NULL DEFAULT ''
-                """
-            )
-        )
-        connection.execute(
-            text(
-                """
-                ALTER TABLE rol
-                ADD COLUMN IF NOT EXISTS tipo VARCHAR(50)
-                """
-            )
-        )
-        connection.execute(
-            text(
-                """
-                ALTER TABLE rol
-                ADD COLUMN IF NOT EXISTS id_empresa INTEGER
-                """
-            )
-        )
-        connection.execute(
-            text(
-                """
-                DO $$
-                DECLARE
-                    constraint_name TEXT;
-                BEGIN
-                    FOR constraint_name IN
-                        SELECT con.conname
-                        FROM pg_constraint con
-                        JOIN pg_class rel ON rel.oid = con.conrelid
-                        JOIN pg_namespace nsp ON nsp.oid = rel.relnamespace
-                        WHERE rel.relname = 'rol'
-                          AND nsp.nspname = current_schema()
-                          AND con.contype = 'u'
-                          AND (
-                              SELECT array_agg(att.attname ORDER BY key_column.ordinality)
-                              FROM unnest(con.conkey) WITH ORDINALITY AS key_column(attnum, ordinality)
-                              JOIN pg_attribute att
-                                ON att.attrelid = rel.oid
-                               AND att.attnum = key_column.attnum
-                          ) = ARRAY['nombre']::name[]
-                    LOOP
-                        EXECUTE format(
-                            'ALTER TABLE rol DROP CONSTRAINT %I',
-                            constraint_name
-                        );
-                    END LOOP;
+    statements = [
+        # 1. factura iva
+        """
+        ALTER TABLE factura
+        ADD COLUMN IF NOT EXISTS iva NUMERIC(12, 2) NOT NULL DEFAULT 0.00
+        """,
+        # 2. factura pdf_generado
+        """
+        ALTER TABLE factura
+        ADD COLUMN IF NOT EXISTS pdf_generado TEXT NOT NULL DEFAULT ''
+        """,
+        # 3. rol tipo
+        """
+        ALTER TABLE rol
+        ADD COLUMN IF NOT EXISTS tipo VARCHAR(50)
+        """,
+        # 4. rol id_empresa
+        """
+        ALTER TABLE rol
+        ADD COLUMN IF NOT EXISTS id_empresa INTEGER
+        """,
+        # 5. uq_rol_nombre_empresa
+        """
+        DO $$
+        DECLARE
+            constraint_name TEXT;
+        BEGIN
+            FOR constraint_name IN
+                SELECT con.conname
+                FROM pg_constraint con
+                JOIN pg_class rel ON rel.oid = con.conrelid
+                JOIN pg_namespace nsp ON nsp.oid = rel.relnamespace
+                WHERE rel.relname = 'rol'
+                  AND nsp.nspname = current_schema()
+                  AND con.contype = 'u'
+                  AND (
+                      SELECT array_agg(att.attname ORDER BY key_column.ordinality)
+                      FROM unnest(con.conkey) WITH ORDINALITY AS key_column(attnum, ordinality)
+                      JOIN pg_attribute att
+                        ON att.attrelid = rel.oid
+                       AND att.attnum = key_column.attnum
+                  ) = ARRAY['nombre']::name[]
+            LOOP
+                EXECUTE format(
+                    'ALTER TABLE rol DROP CONSTRAINT %I',
+                    constraint_name
+                );
+            END LOOP;
 
-                    IF NOT EXISTS (
-                        SELECT 1
-                        FROM pg_constraint
-                        WHERE conname = 'uq_rol_nombre_empresa'
-                    ) THEN
-                        ALTER TABLE rol
-                        ADD CONSTRAINT uq_rol_nombre_empresa
-                        UNIQUE (nombre, id_empresa);
-                    END IF;
-                END $$;
-                """
-            )
-        )
-        connection.execute(
-            text(
-                """
-                DO $$
-                BEGIN
-                    IF NOT EXISTS (
-                        SELECT 1
-                        FROM pg_constraint
-                        WHERE conname = 'fk_rol_empresa'
-                    ) THEN
-                        ALTER TABLE rol
-                        ADD CONSTRAINT fk_rol_empresa
-                        FOREIGN KEY (id_empresa)
-                        REFERENCES empresa(id_empresa);
-                    END IF;
-                END $$;
-                """
-            )
-        )
-        connection.execute(
-            text(
-                """
+            IF NOT EXISTS (
+                SELECT 1
+                FROM pg_constraint
+                WHERE conname = 'uq_rol_nombre_empresa'
+            ) THEN
+                ALTER TABLE rol
+                ADD CONSTRAINT uq_rol_nombre_empresa
+                UNIQUE (nombre, id_empresa);
+            END IF;
+        END $$;
+        """,
+        # 6. fk_rol_empresa
+        """
+        DO $$
+        BEGIN
+            IF NOT EXISTS (
+                SELECT 1
+                FROM pg_constraint
+                WHERE conname = 'fk_rol_empresa'
+            ) THEN
+                ALTER TABLE rol
+                ADD CONSTRAINT fk_rol_empresa
+                FOREIGN KEY (id_empresa)
+                REFERENCES empresa(id_empresa);
+            END IF;
+        END $$;
+        """,
+        # 7. usuario_rol id_sucursal
+        """
+        ALTER TABLE usuario_rol
+        ADD COLUMN IF NOT EXISTS id_sucursal INTEGER
+        """,
+        # 8. fk_usuario_rol_sucursal
+        """
+        DO $$
+        BEGIN
+            IF NOT EXISTS (
+                SELECT 1
+                FROM pg_constraint
+                WHERE conname = 'fk_usuario_rol_sucursal'
+            ) THEN
                 ALTER TABLE usuario_rol
-                ADD COLUMN IF NOT EXISTS id_sucursal INTEGER
-                """
-            )
-        )
-        connection.execute(
-            text(
-                """
-                DO $$
-                BEGIN
-                    IF NOT EXISTS (
-                        SELECT 1
-                        FROM pg_constraint
-                        WHERE conname = 'fk_usuario_rol_sucursal'
-                    ) THEN
-                        ALTER TABLE usuario_rol
-                        ADD CONSTRAINT fk_usuario_rol_sucursal
-                        FOREIGN KEY (id_sucursal)
-                        REFERENCES sucursal(id_sucursal);
-                    END IF;
-                END $$;
-                """
-            )
-        )
-        connection.execute(
-            text(
-                """
+                ADD CONSTRAINT fk_usuario_rol_sucursal
+                FOREIGN KEY (id_sucursal)
+                REFERENCES sucursal(id_sucursal);
+            END IF;
+        END $$;
+        """,
+        # 9. movimiento_inventario id_usuario
+        """
+        ALTER TABLE movimiento_inventario
+        ADD COLUMN IF NOT EXISTS id_usuario INTEGER
+        """,
+        # 10. drop not null id_metodo_pago
+        """
+        DO $$
+        BEGIN
+            IF EXISTS (
+                SELECT 1
+                FROM information_schema.columns
+                WHERE table_name = 'movimiento_caja'
+                  AND column_name = 'id_metodo_pago'
+                  AND is_nullable = 'NO'
+            ) THEN
+                ALTER TABLE movimiento_caja ALTER COLUMN id_metodo_pago DROP NOT NULL;
+            END IF;
+        END $$;
+        """,
+        # 11. movimiento_caja columns
+        """
+        ALTER TABLE movimiento_caja
+        ADD COLUMN IF NOT EXISTS monto NUMERIC(12, 2) DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS concepto TEXT
+        """,
+        # 12. fk_movimiento_inventario_usuario
+        """
+        DO $$
+        BEGIN
+            IF NOT EXISTS (
+                SELECT 1
+                FROM pg_constraint
+                WHERE conname = 'fk_movimiento_inventario_usuario'
+            ) THEN
                 ALTER TABLE movimiento_inventario
-                ADD COLUMN IF NOT EXISTS id_usuario INTEGER
-                """
-            )
-        )
-        connection.execute(
-            text(
-                """
-                DO $$
-                BEGIN
-                    IF EXISTS (
-                        SELECT 1
-                        FROM information_schema.columns
-                        WHERE table_name = 'movimiento_caja'
-                          AND column_name = 'id_metodo_pago'
-                          AND is_nullable = 'NO'
-                    ) THEN
-                        ALTER TABLE movimiento_caja ALTER COLUMN id_metodo_pago DROP NOT NULL;
-                    END IF;
-                END $$;
-                """
-            )
-        )
-        connection.execute(
-            text(
-                """
-                ALTER TABLE movimiento_caja
-                ADD COLUMN IF NOT EXISTS monto NUMERIC(12, 2) DEFAULT 0,
-                ADD COLUMN IF NOT EXISTS concepto TEXT
-                """
-            )
-        )
-        connection.execute(
-            text(
-                """
-                DO $$
-                BEGIN
-                    IF NOT EXISTS (
-                        SELECT 1
-                        FROM pg_constraint
-                        WHERE conname = 'fk_movimiento_inventario_usuario'
-                    ) THEN
-                        ALTER TABLE movimiento_inventario
-                        ADD CONSTRAINT fk_movimiento_inventario_usuario
-                        FOREIGN KEY (id_usuario)
-                        REFERENCES usuario(id_usuario);
-                    END IF;
-                END $$;
-                """
-            )
-        )
-        connection.execute(
-            text(
-                """
-                DO $$
-                BEGIN
-                    IF EXISTS (
-                        SELECT 1
-                        FROM information_schema.columns
-                        WHERE table_name = 'venta'
-                          AND column_name = 'id_cliente'
-                          AND is_nullable = 'NO'
-                    ) THEN
-                        ALTER TABLE venta ALTER COLUMN id_cliente DROP NOT NULL;
-                    END IF;
-                END $$;
-                """
-            )
-        )
-        connection.execute(
-            text(
-                """
+                ADD CONSTRAINT fk_movimiento_inventario_usuario
+                FOREIGN KEY (id_usuario)
+                REFERENCES usuario(id_usuario);
+            END IF;
+        END $$;
+        """,
+        # 13. drop not null id_cliente
+        """
+        DO $$
+        BEGIN
+            IF EXISTS (
+                SELECT 1
+                FROM information_schema.columns
+                WHERE table_name = 'venta'
+                  AND column_name = 'id_cliente'
+                  AND is_nullable = 'NO'
+            ) THEN
+                ALTER TABLE venta ALTER COLUMN id_cliente DROP NOT NULL;
+            END IF;
+        END $$;
+        """,
+        # 14. caja_sesion id_usuario
+        """
+        ALTER TABLE caja_sesion
+        ADD COLUMN IF NOT EXISTS id_usuario INTEGER
+        """,
+        # 15. fk_caja_sesion_usuario
+        """
+        DO $$
+        BEGIN
+            IF NOT EXISTS (
+                SELECT 1
+                FROM pg_constraint
+                WHERE conname = 'fk_caja_sesion_usuario'
+            ) THEN
                 ALTER TABLE caja_sesion
-                ADD COLUMN IF NOT EXISTS id_usuario INTEGER
-                """
-            )
-        )
-        connection.execute(
-            text(
-                """
-                DO $$
-                BEGIN
-                    IF NOT EXISTS (
-                        SELECT 1
-                        FROM pg_constraint
-                        WHERE conname = 'fk_caja_sesion_usuario'
-                    ) THEN
-                        ALTER TABLE caja_sesion
-                        ADD CONSTRAINT fk_caja_sesion_usuario
-                        FOREIGN KEY (id_usuario)
-                        REFERENCES usuario(id_usuario);
-                    END IF;
-                END $$;
-                """
-            )
-        )
-        connection.execute(
-            text(
-                """
+                ADD CONSTRAINT fk_caja_sesion_usuario
+                FOREIGN KEY (id_usuario)
+                REFERENCES usuario(id_usuario);
+            END IF;
+        END $$;
+        """,
+        # 16. categoria_producto id_empresa
+        """
+        ALTER TABLE categoria_producto
+        ADD COLUMN IF NOT EXISTS id_empresa INTEGER
+        """,
+        # 17. fk_categoria_producto_empresa
+        """
+        DO $$
+        BEGIN
+            IF NOT EXISTS (
+                SELECT 1
+                FROM pg_constraint
+                WHERE conname = 'fk_categoria_producto_empresa'
+            ) THEN
                 ALTER TABLE categoria_producto
-                ADD COLUMN IF NOT EXISTS id_empresa INTEGER
-                """
-            )
-        )
-        connection.execute(
-            text(
-                """
-                DO $$
-                BEGIN
-                    IF NOT EXISTS (
-                        SELECT 1
-                        FROM pg_constraint
-                        WHERE conname = 'fk_categoria_producto_empresa'
-                    ) THEN
-                        ALTER TABLE categoria_producto
-                        ADD CONSTRAINT fk_categoria_producto_empresa
-                        FOREIGN KEY (id_empresa)
-                        REFERENCES empresa(id_empresa);
-                    END IF;
-                END $$;
-                """
-            )
-        )
-        connection.execute(
-            text(
-                """
+                ADD CONSTRAINT fk_categoria_producto_empresa
+                FOREIGN KEY (id_empresa)
+                REFERENCES empresa(id_empresa);
+            END IF;
+        END $$;
+        """,
+        # 18. producto columns
+        """
+        ALTER TABLE producto
+        DROP COLUMN IF EXISTS costo,
+        ADD COLUMN IF NOT EXISTS id_empresa INTEGER,
+        ADD COLUMN IF NOT EXISTS id_subcategoria INTEGER,
+        ADD COLUMN IF NOT EXISTS codigo_barra VARCHAR(100),
+        ADD COLUMN IF NOT EXISTS descripcion TEXT,
+        ADD COLUMN IF NOT EXISTS unidad_medida VARCHAR(50),
+        ADD COLUMN IF NOT EXISTS imagen VARCHAR(255),
+        ADD COLUMN IF NOT EXISTS activo BOOLEAN DEFAULT TRUE
+        """,
+        # 19. fk_producto_empresa
+        """
+        DO $$
+        BEGIN
+            IF NOT EXISTS (
+                SELECT 1
+                FROM pg_constraint
+                WHERE conname = 'fk_producto_empresa'
+            ) THEN
                 ALTER TABLE producto
-                DROP COLUMN IF EXISTS costo,
-                ADD COLUMN IF NOT EXISTS id_empresa INTEGER,
-                ADD COLUMN IF NOT EXISTS id_subcategoria INTEGER,
-                ADD COLUMN IF NOT EXISTS codigo_barra VARCHAR(100),
-                ADD COLUMN IF NOT EXISTS descripcion TEXT,
-                ADD COLUMN IF NOT EXISTS unidad_medida VARCHAR(50),
-                ADD COLUMN IF NOT EXISTS imagen VARCHAR(255),
-                ADD COLUMN IF NOT EXISTS activo BOOLEAN DEFAULT TRUE
-                """
-            )
-        )
-        connection.execute(
-            text(
-                """
-                DO $$
-                BEGIN
-                    IF NOT EXISTS (
-                        SELECT 1
-                        FROM pg_constraint
-                        WHERE conname = 'fk_producto_empresa'
-                    ) THEN
-                        ALTER TABLE producto
-                        ADD CONSTRAINT fk_producto_empresa
-                        FOREIGN KEY (id_empresa)
-                        REFERENCES empresa(id_empresa);
-                    END IF;
-                END $$;
-                """
-            )
-        )
-        connection.execute(
-            text(
-                """
-                DO $$
-                BEGIN
-                    IF NOT EXISTS (
-                        SELECT 1
-                        FROM pg_constraint
-                        WHERE conname = 'fk_producto_subcategoria'
-                    ) THEN
-                        ALTER TABLE producto
-                        ADD CONSTRAINT fk_producto_subcategoria
-                        FOREIGN KEY (id_subcategoria)
-                        REFERENCES subcategoria_producto(id_subcategoria);
-                    END IF;
-                END $$;
-                """
-            )
-        )
-        connection.execute(
-            text(
-                """
+                ADD CONSTRAINT fk_producto_empresa
+                FOREIGN KEY (id_empresa)
+                REFERENCES empresa(id_empresa);
+            END IF;
+        END $$;
+        """,
+        # 20. fk_producto_subcategoria
+        """
+        DO $$
+        BEGIN
+            IF NOT EXISTS (
+                SELECT 1
+                FROM pg_constraint
+                WHERE conname = 'fk_producto_subcategoria'
+            ) THEN
+                ALTER TABLE producto
+                ADD CONSTRAINT fk_producto_subcategoria
+                FOREIGN KEY (id_subcategoria)
+                REFERENCES subcategoria_producto(id_subcategoria);
+            END IF;
+        END $$;
+        """,
+        # 21. uq_usuario_rol drop
+        """
+        ALTER TABLE usuario_rol
+        DROP CONSTRAINT IF EXISTS uq_usuario_rol
+        """,
+        # 22. uq_usuario_rol_sucursal
+        """
+        DO $$
+        BEGIN
+            IF NOT EXISTS (
+                SELECT 1
+                FROM pg_constraint
+                WHERE conname = 'uq_usuario_rol_sucursal'
+            ) THEN
                 ALTER TABLE usuario_rol
-                DROP CONSTRAINT IF EXISTS uq_usuario_rol
-                """
-            )
-        )
-        connection.execute(
-            text(
-                """
-                DO $$
-                BEGIN
-                    IF NOT EXISTS (
-                        SELECT 1
-                        FROM pg_constraint
-                        WHERE conname = 'uq_usuario_rol_sucursal'
-                    ) THEN
-                        ALTER TABLE usuario_rol
-                        ADD CONSTRAINT uq_usuario_rol_sucursal
-                        UNIQUE (id_usuario, id_rol, id_empresa, id_sucursal);
-                    END IF;
-                END $$;
-                """
-            )
-        )
-        # Asegurar que saldo_credito y limite_credito permiten NULL
-        connection.execute(
-            text(
-                """
-                DO $$
-                BEGIN
-                    -- quitar NOT NULL si existe
-                    IF EXISTS (
-                        SELECT 1
-                        FROM information_schema.columns
-                        WHERE table_name='cliente' AND column_name='saldo_credito' AND is_nullable='NO'
-                    ) THEN
-                        ALTER TABLE cliente ALTER COLUMN saldo_credito DROP NOT NULL;
-                    END IF;
-                    IF EXISTS (
-                        SELECT 1
-                        FROM information_schema.columns
-                        WHERE table_name='cliente' AND column_name='limite_credito' AND is_nullable='NO'
-                    ) THEN
-                        ALTER TABLE cliente ALTER COLUMN limite_credito DROP NOT NULL;
-                    END IF;
-                END $$;
-                """
-            )
-        )
-        connection.execute(
-            text(
-                """
-                ALTER TABLE detalle_venta
-                ADD COLUMN IF NOT EXISTS descripcion TEXT
-                """
-            )
-        )
-        # ---------------------------------------------------------------
-        # Stripe Checkout — trazabilidad e idempotencia en historial_suscripcion
-        # ---------------------------------------------------------------
-        connection.execute(
-            text(
-                """
+                ADD CONSTRAINT uq_usuario_rol_sucursal
+                UNIQUE (id_usuario, id_rol, id_empresa, id_sucursal);
+            END IF;
+        END $$;
+        """,
+        # 23. drop not null saldo_credito, limite_credito
+        """
+        DO $$
+        BEGIN
+            -- quitar NOT NULL si existe
+            IF EXISTS (
+                SELECT 1
+                FROM information_schema.columns
+                WHERE table_name='cliente' AND column_name='saldo_credito' AND is_nullable='NO'
+            ) THEN
+                ALTER TABLE cliente ALTER COLUMN saldo_credito DROP NOT NULL;
+            END IF;
+            IF EXISTS (
+                SELECT 1
+                FROM information_schema.columns
+                WHERE table_name='cliente' AND column_name='limite_credito' AND is_nullable='NO'
+            ) THEN
+                ALTER TABLE cliente ALTER COLUMN limite_credito DROP NOT NULL;
+            END IF;
+        END $$;
+        """,
+        # 24. detalle_venta descripcion
+        """
+        ALTER TABLE detalle_venta
+        ADD COLUMN IF NOT EXISTS descripcion TEXT
+        """,
+        # 25. historial_suscripcion stripe columns
+        """
+        ALTER TABLE historial_suscripcion
+        ADD COLUMN IF NOT EXISTS stripe_session_id         VARCHAR(255),
+        ADD COLUMN IF NOT EXISTS stripe_payment_intent_id  VARCHAR(255),
+        ADD COLUMN IF NOT EXISTS stripe_payment_status     VARCHAR(50)
+        """,
+        # 26. uq_historial_suscripcion_stripe_session
+        """
+        DO $$
+        BEGIN
+            IF NOT EXISTS (
+                SELECT 1
+                FROM pg_constraint
+                WHERE conname = 'uq_historial_suscripcion_stripe_session'
+            ) THEN
                 ALTER TABLE historial_suscripcion
-                ADD COLUMN IF NOT EXISTS stripe_session_id         VARCHAR(255),
-                ADD COLUMN IF NOT EXISTS stripe_payment_intent_id  VARCHAR(255),
-                ADD COLUMN IF NOT EXISTS stripe_payment_status     VARCHAR(50)
-                """
-            )
-        )
-        connection.execute(
-            text(
-                """
-                DO $$
-                BEGIN
-                    IF NOT EXISTS (
-                        SELECT 1
-                        FROM pg_constraint
-                        WHERE conname = 'uq_historial_suscripcion_stripe_session'
-                    ) THEN
-                        ALTER TABLE historial_suscripcion
-                        ADD CONSTRAINT uq_historial_suscripcion_stripe_session
-                        UNIQUE (stripe_session_id);
-                    END IF;
-                END $$;
-                """
-            )
-        )
+                ADD CONSTRAINT uq_historial_suscripcion_stripe_session
+                UNIQUE (stripe_session_id);
+            END IF;
+        END $$;
+        """
+    ]
+
+    for stmt in statements:
+        try:
+            with engine.begin() as connection:
+                connection.execute(text(stmt))
+        except Exception as e:
+            query_preview = stmt.strip().split("\n")[0][:60]
+            print(f"[SCHEMA WARNING] Ignored deadlock/lock error: {query_preview}... Error: {e}")
