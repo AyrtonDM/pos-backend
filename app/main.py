@@ -20,7 +20,7 @@ from app.models.empresas import (
 from app.models.inventario import MovimientoInventario, Stock, TipoMovimiento
 from app.models.productos import CategoriaProducto, Producto, SubcategoriaProducto
 from app.models.usuarios import Persona, Rol, Usuario, UsuarioRol, Modulo, Permiso, RolPermiso
-from app.models.ventas import MetodoPago, TipoVenta, Venta, VentaPago
+from app.models.ventas import CuentaPorCobrar, MetodoPago, PagoCredito, TipoVenta, Venta, VentaPago
 from app.routers.cliente_router import categoria_cliente_router, cliente_router
 from app.routers.empresa_router import router as empresa_router
 from app.routers.auth_router import router as auth_router
@@ -89,7 +89,7 @@ def on_startup() -> None:
     apply_schema_updates()
     db = SessionLocal()
     try:
-        run_seeds(db)
+        # run_seeds(db)
         InventarioService.sincronizar_stocks_iniciales(db=db)
         db.commit()
     except Exception:

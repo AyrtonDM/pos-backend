@@ -15,6 +15,10 @@ from app.schemas.reporte_schema import (
     MovimientosCajaEmpresaResponse,
     MovimientosInventarioEmpresaResponse,
     PlantillaReporte,
+    ProductoReporteAbastecimiento,
+    ReporteProductosSucursalRequest,
+    RecomendacionProductosRequest,
+    RecomendacionProductosResponse,
     ReporteInventarioParametrizadoRequest,
     ReporteInventarioParametrizadoResponse,
     ReporteCajasParametrizadoRequest,
@@ -45,6 +49,54 @@ def get_db():
 @router.get("/templates", response_model=list[PlantillaReporte])
 def listar_plantillas(_: Usuario = Depends(get_current_user)):
     return ReportesService.obtener_catalogo()
+
+
+@router.post("/productos-abastecimiento", response_model=list[ProductoReporteAbastecimiento])
+def obtener_productos_para_abastecimiento(
+    filtros: ReporteProductosSucursalRequest,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    try:
+        return ReportesService.obtener_productos_para_abastecimiento(
+            db=db,
+            current_user=current_user,
+            id_sucursal=filtros.id_sucursal,
+        )
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error al obtener el reporte de abastecimiento: {exc}",
+        ) from exc
+
+
+@router.post("/recomendar-productos", response_model=RecomendacionProductosResponse)
+def recomendar_productos(
+    solicitud: RecomendacionProductosRequest,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    try:
+        return ReportesService.recomendar_productos_con_ia(
+            db=db,
+            current_user=current_user,
+            id_productos=solicitud.id_productos,
+        )
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error al recomendar productos: {exc}",
+        ) from exc
 
 
 @router.get("/{empresa_id}/resumenventas", response_model=ResumenVentasEmpresaResponse)

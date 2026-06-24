@@ -212,6 +212,7 @@ class InventarioService:
         id_empresa: int,
         id_sucursal: int,
         payload: MovimientoInventarioCreate,
+        commit: bool = True,
     ) -> MovimientoInventarioResponse:
         InventarioService._validar_empresa_y_sucursal_del_usuario(
             db=db,
@@ -282,10 +283,12 @@ class InventarioService:
                 },
                 db=db,
             )
-            db.commit()
+            if commit:
+                db.commit()
 
             if (
-                stock.stock_minimo is not None
+                commit
+                and stock.stock_minimo is not None
                 and stock.cantidad <= stock.stock_minimo
                 and stock.producto is not None
                 and stock.sucursal is not None
@@ -313,18 +316,19 @@ class InventarioService:
                 except Exception:
                     # The stock movement must not fail if alert delivery has a problem.
                     pass
-            # Use a fresh session to read the movimiento after commit to avoid
-            # issues if the caller's session is in an aborted state.
-            from app.core.database import SessionLocal
+            if commit:
+                # Use a fresh session to read the movimiento after commit to avoid
+                # issues if the caller's session is in an aborted state.
+                from app.core.database import SessionLocal
 
-            read_session = SessionLocal()
-            try:
-                movimiento = InventarioRepository.obtener_movimiento_por_id(
-                    db=read_session,
-                    id_movimiento_inventario=id_movimiento_creado,
-                )
-            finally:
-                read_session.close()
+                read_session = SessionLocal()
+                try:
+                    movimiento = InventarioRepository.obtener_movimiento_por_id(
+                        db=read_session,
+                        id_movimiento_inventario=id_movimiento_creado,
+                    )
+                finally:
+                    read_session.close()
             return MovimientoInventarioResponse.model_validate(
                 InventarioService._serializar_movimiento(
                     movimiento=movimiento,

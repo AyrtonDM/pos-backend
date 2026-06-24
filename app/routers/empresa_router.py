@@ -19,11 +19,13 @@ from app.schemas.cliente_schema import (
     ClienteResponse,
     ClienteUpdate,
 )
+from app.schemas.venta_schema import CuentaPorCobrarClienteResponse
 from app.schemas.empresa_schema import EmpresaCreate, EmpresaResponse, EmpresaUpdate
 from app.schemas.permiso_schema import MisPermisosEmpresaResponse, PermisoConRolPermisoResponse, PermisoResponse, PermisosPorModuloResponse
 from app.services.cliente_service import ClienteService
 from app.services.empresa_service import EmpresaService
 from app.services.producto_service import ProductoService
+from app.services.venta_service import VentaService
 from app.utils.product_image_storage import save_product_image
 from app.services.bitacora_service import registrar_accion
 from fastapi import File, Form, UploadFile
@@ -258,7 +260,7 @@ def actualizar_categoria_cliente_empresa(
             id_categoria_cliente=id_categoria_cliente,
             nombre=datos.nombre,
             descripcion=datos.descripcion,
-            permite_credito=datos.permite_credito,
+            plazo_credito=datos.plazo_credito,
             descuento_base=datos.descuento_base,
             limite_credito=datos.limite_credito,
             activo=datos.activo,
@@ -297,6 +299,36 @@ def actualizar_cliente_empresa(
         raise HTTPException(status_code=400, detail=str(e))
     except Exception:
         raise HTTPException(status_code=500, detail="Error al actualizar el cliente.")
+
+
+@router.get(
+    "/{id_empresa}/clientes/{id_cliente}/cuentas-por-cobrar",
+    response_model=list[CuentaPorCobrarClienteResponse],
+)
+def listar_cuentas_por_cobrar_de_cliente(
+    id_empresa: int,
+    id_cliente: int,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    try:
+        return VentaService.obtener_cuentas_por_cobrar_de_cliente(
+            db=db,
+            current_user=current_user,
+            id_empresa=id_empresa,
+            id_cliente=id_cliente,
+        )
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception:
+        raise HTTPException(
+            status_code=500,
+            detail="Error al listar las cuentas por cobrar del cliente.",
+        )
 
 
 @router.get("/{id_empresa}/subcategorias", response_model=list[SubcategoriaProductoResponse])

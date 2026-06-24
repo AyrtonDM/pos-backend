@@ -11,6 +11,7 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
 from passlib.context import CryptContext
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
 from app.core.database import SessionLocal
@@ -30,8 +31,17 @@ def get_db():
     db = SessionLocal()
     try:
         yield db
+    except Exception:
+        try:
+            db.rollback()
+        except OperationalError:
+            db.invalidate()
+        raise
     finally:
-        db.close()
+        try:
+            db.close()
+        except OperationalError:
+            db.invalidate()
 
 
 def create_access_token(user_id: int, email: str, roles: list | None = None) -> str:

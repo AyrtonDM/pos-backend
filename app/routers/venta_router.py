@@ -1,10 +1,17 @@
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
 from app.core.database import SessionLocal
 from app.models.ventas import MetodoPago, TipoVenta
 from app.schemas.venta_schema import MetodoPagoResponse, TipoVentaResponse
-from app.schemas.venta_schema import VentaCreate, VentaResponse
+from app.schemas.venta_schema import (
+    CobroCuentaPorCobrarCreate,
+    CobroCuentaPorCobrarResponse,
+    VentaCreate,
+    VentaCreateResponse,
+    VentaResponse,
+)
 from app.core.security import get_current_user
 from app.services.venta_service import VentaService
 from app.services.bitacora_service import registrar_accion
@@ -18,8 +25,17 @@ def get_db():
     db = SessionLocal()
     try:
         yield db
+    except Exception:
+        try:
+            db.rollback()
+        except OperationalError:
+            db.invalidate()
+        raise
     finally:
-        db.close()
+        try:
+            db.close()
+        except OperationalError:
+            db.invalidate()
 
 
 @venta_router.get("/tipos-venta", response_model=list[TipoVentaResponse])
@@ -49,7 +65,7 @@ def listar_metodos_pago(db: Session = Depends(get_db)):
 
 
 
-@venta_router.post("/sesiones/{id_caja_sesion}/ventas", response_model=VentaResponse)
+@venta_router.post("/sesiones/{id_caja_sesion}/ventas", response_model=VentaCreateResponse)
 def crear_venta(id_caja_sesion: int, datos: VentaCreate, db: Session = Depends(get_db), current_user: Usuario = Depends(get_current_user)):
     resultado = VentaService.crear_venta_completa(db=db, current_user=current_user, id_caja_sesion=id_caja_sesion, payload=datos)
     
@@ -85,3 +101,39 @@ def historial_ventas(id_caja_sesion: int, db: Session = Depends(get_db), current
         raise
     except Exception:
         raise HTTPException(status_code=500, detail="Error al obtener historial de ventas.")
+
+
+@venta_router.post(
+    "/sesiones/{id_caja_sesion}/pagos-credito",
+    response_model=CobroCuentaPorCobrarResponse,
+)
+def registrar_pago_credito(
+    id_caja_sesion: int,
+    datos: CobroCuentaPorCobrarCreate,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    resultado = VentaService.registrar_pago_cuenta_por_cobrar(
+        db=db,
+        current_user=current_user,
+        id_caja_sesion=id_caja_sesion,
+        payload=datos,
+    )
+
+    try:
+        usuario_nombre = (
+            getattr(current_user.persona, "nombre_completo", None)
+            if getattr(current_user, "persona", None)
+            else getattr(current_user, "email", "UsuarioDesconocido")
+        )
+        registrar_accion(
+            usuario_nombre=usuario_nombre,
+            accion=(
+                f"Registro pago de credito CXC: {resultado['id_cxc']}, "
+                f"total: {resultado['total_pagado']}"
+            ),
+        )
+    except Exception:
+        pass
+
+    return resultado
