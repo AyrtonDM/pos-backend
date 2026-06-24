@@ -18,6 +18,7 @@ from app.schemas.factura_schema import (
     FacturaDetalleResponse,
     FacturaListadoResponse,
     FacturaVentaResponse,
+    ReenviarFacturaResponse,
 )
 from app.utils.email_service import send_invoice_email
 
@@ -26,6 +27,69 @@ class FacturaService:
     APP_DIR = Path(__file__).resolve().parents[1]
     XML_DIR = APP_DIR / "XMLS"
     PDF_DIR = XML_DIR / "PDFS"
+
+    @staticmethod
+    def reenviar_factura_empresa(
+        db: Session,
+        current_user,
+        id_empresa: int,
+        id_factura: int,
+    ) -> ReenviarFacturaResponse:
+        empresa = EmpresaRepository.obtener_empresa_por_usuario(
+            db=db,
+            id_usuario=current_user.id_usuario,
+            id_empresa=id_empresa,
+        )
+        if empresa is None:
+            raise LookupError("Empresa no encontrada para este usuario.")
+
+        factura = (
+            db.query(Factura)
+            .join(Factura.venta)
+            .join(Venta.caja_sesion)
+            .join(CajaSesion.caja)
+            .join(Caja.sucursal)
+            .options(
+                joinedload(Factura.venta)
+                .joinedload(Venta.cliente)
+                .joinedload(Cliente.usuario)
+                .joinedload(Usuario.persona)
+            )
+            .filter(
+                Factura.id_factura == id_factura,
+                Sucursal.id_empresa == id_empresa,
+            )
+            .first()
+        )
+        if factura is None:
+            raise LookupError("Factura no encontrada para esta empresa.")
+
+        cliente = factura.venta.cliente
+        if cliente is None or cliente.usuario is None:
+            raise ValueError("La factura no tiene un cliente con usuario asociado.")
+
+        ruta_relativa = Path(factura.pdf_generado)
+        ruta_pdf = (FacturaService.APP_DIR / ruta_relativa).resolve()
+        pdf_dir = FacturaService.PDF_DIR.resolve()
+        if pdf_dir not in ruta_pdf.parents:
+            raise ValueError("La ruta del PDF de la factura no es valida.")
+        if not ruta_pdf.is_file():
+            raise LookupError("No se encontro el PDF generado de la factura.")
+
+        enviado = FacturaService.enviar_factura(
+            cliente=cliente,
+            factura=factura,
+            ruta_pdf=ruta_pdf,
+        )
+        if not enviado:
+            raise RuntimeError("No se pudo enviar la factura por correo.")
+
+        return ReenviarFacturaResponse(
+            mensaje="Factura reenviada correctamente.",
+            id_factura=factura.id_factura,
+            correo_cliente=cliente.usuario.email,
+            enviado=True,
+        )
 
     @staticmethod
     def listar_facturas_empresa(

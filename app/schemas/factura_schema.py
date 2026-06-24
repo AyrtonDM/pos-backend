@@ -1,7 +1,7 @@
 from datetime import datetime
 from decimal import Decimal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class FacturaDetalleResponse(BaseModel):
@@ -45,3 +45,14 @@ class FacturaListadoResponse(BaseModel):
     xml_generado: str
     pdf_generado: str
     venta: FacturaVentaResponse
+
+
+class ReenviarFacturaRequest(BaseModel):
+    id_factura: int = Field(gt=0)
+
+
+class ReenviarFacturaResponse(BaseModel):
+    mensaje: str
+    id_factura: int
+    correo_cliente: str
+    enviado: bool

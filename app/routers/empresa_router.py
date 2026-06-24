@@ -20,7 +20,11 @@ from app.schemas.cliente_schema import (
     ClienteUpdate,
 )
 from app.schemas.venta_schema import CuentaPorCobrarClienteResponse
-from app.schemas.factura_schema import FacturaListadoResponse
+from app.schemas.factura_schema import (
+    FacturaListadoResponse,
+    ReenviarFacturaRequest,
+    ReenviarFacturaResponse,
+)
 from app.schemas.empresa_schema import EmpresaCreate, EmpresaResponse, EmpresaUpdate
 from app.schemas.permiso_schema import MisPermisosEmpresaResponse, PermisoConRolPermisoResponse, PermisoResponse, PermisosPorModuloResponse
 from app.services.cliente_service import ClienteService
@@ -63,6 +67,33 @@ def listar_facturas_empresa(
         raise HTTPException(status_code=404, detail=str(e))
     except Exception:
         raise HTTPException(status_code=500, detail="Error al listar las facturas.")
+
+
+@router.post(
+    "/{id_empresa}/facturas/reenviar",
+    response_model=ReenviarFacturaResponse,
+)
+def reenviar_factura_empresa(
+    id_empresa: int,
+    datos: ReenviarFacturaRequest,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    try:
+        return FacturaService.reenviar_factura_empresa(
+            db=db,
+            current_user=current_user,
+            id_empresa=id_empresa,
+            id_factura=datos.id_factura,
+        )
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except RuntimeError as e:
+        raise HTTPException(status_code=502, detail=str(e))
+    except Exception:
+        raise HTTPException(status_code=500, detail="Error al reenviar la factura.")
 
 
 @router.get("/mis-empresas", response_model=list[EmpresaResponse])
