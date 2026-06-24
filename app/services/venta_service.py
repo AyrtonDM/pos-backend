@@ -229,6 +229,30 @@ class VentaService:
             # Commit transaction una vez todo creado
             db.commit()
 
+            # Notify the client about their new credit account
+            if es_venta_credito and cuenta_por_cobrar and cliente:
+                try:
+                    from app.models.empresas import Empresa
+                    from app.services.notification_service import NotificationService
+                    empresa = db.query(Empresa).filter(Empresa.id_empresa == caja_sesion.caja.sucursal.id_empresa).first()
+                    empresa_nombre = empresa.nombre if empresa else "la empresa"
+                    NotificationService.enviar_notificacion_usuario(
+                        db=db,
+                        id_usuario=cliente.id_usuario,
+                        id_empresa=caja_sesion.caja.sucursal.id_empresa,
+                        titulo="Nueva cuenta de crédito",
+                        mensaje=f"Se ha registrado una nueva cuenta de crédito por ${payload.total} en {empresa_nombre}. Vence el {cuenta_por_cobrar.fecha_vencimiento.strftime('%d/%m/%Y')}.",
+                        payload={
+                            "tipo": "NUEVO_CREDITO",
+                            "id_cxc": cuenta_por_cobrar.id_cxc,
+                            "id_venta": venta.id_venta,
+                            "monto_credito": float(payload.total)
+                        }
+                    )
+                except Exception as e:
+                    import logging
+                    logging.exception("Error al enviar notificacion de nueva cuenta de credito")
+
             # Recuperar la venta con sus detalles cargados para poder serializarla sin problemas
             venta = VentaRepository.obtener_venta_por_id(db=db, id_venta=venta.id_venta)
             if venta is None:
@@ -460,6 +484,33 @@ class VentaService:
                 db.refresh(pago)
             for movimiento in movimientos_creados:
                 db.refresh(movimiento)
+
+            # Notify the client about their payment
+            if cuenta and cuenta.venta and cuenta.venta.cliente:
+                try:
+                    from app.models.empresas import Empresa
+                    from app.services.notification_service import NotificationService
+                    id_empresa = caja_sesion.caja.sucursal.id_empresa
+                    empresa = db.query(Empresa).filter(Empresa.id_empresa == id_empresa).first()
+                    empresa_nombre = empresa.nombre if empresa else "la empresa"
+                    cliente = cuenta.venta.cliente
+                    NotificationService.enviar_notificacion_usuario(
+                        db=db,
+                        id_usuario=cliente.id_usuario,
+                        id_empresa=id_empresa,
+                        titulo="Pago de crédito registrado",
+                        mensaje=f"Se ha registrado un pago por ${total_pagado} a tu cuenta de crédito en {empresa_nombre}. Tu nuevo saldo pendiente es ${cuenta.saldo_pendiente}.",
+                        payload={
+                            "tipo": "PAGO_CREDITO",
+                            "id_cxc": cuenta.id_cxc,
+                            "id_venta": cuenta.venta.id_venta,
+                            "monto_pagado": float(total_pagado),
+                            "saldo_pendiente": float(cuenta.saldo_pendiente)
+                        }
+                    )
+                except Exception as e:
+                    import logging
+                    logging.exception("Error al enviar notificacion de pago de credito")
 
             return {
                 "id_cxc": cuenta.id_cxc,

@@ -28,4 +28,7 @@ google-credentials*.json
 *.p12
 *.jks
 
+# Secrets directory - do not commit
+app/secrets/*.json
+
 

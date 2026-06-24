@@ -42,6 +42,10 @@ from app.routers.plan_router import router as plan_router
 from app.seeds import run_seeds
 from app.services.inventario_service import InventarioService
 from app.websockets.administrador import router as administrador_websocket_router
+from app.websockets.clientes import router as clientes_websocket_router
+
+# Store running event loop to schedule websocket broadcasts from thread pool
+running_loop = None
 
 app = FastAPI(title="POS Backend")
 
@@ -55,6 +59,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
     allow_credentials=True,
+    allow_origin_regex=r"^http://localhost(:[0-9]+)?$",
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -77,6 +82,7 @@ app.include_router(reportes_router)
 app.include_router(pago_router)
 app.include_router(plan_router)
 app.include_router(administrador_websocket_router)
+app.include_router(clientes_websocket_router)
 
 media_root = Path(__file__).resolve().parent / "media"
 media_root.mkdir(parents=True, exist_ok=True)
@@ -84,19 +90,48 @@ app.mount("/media", StaticFiles(directory=media_root), name="media")
 
 @app.on_event("startup")
 def on_startup() -> None:
+    global running_loop
+    import asyncio
+    try:
+        running_loop = asyncio.get_event_loop()
+    except Exception:
+        pass
+    
+    print("\n" + "="*80)
+    print("🚀 INICIANDO SERVIDOR POS BACKEND")
+    print("="*80)
+    
+    # Initialize Firebase on startup for diagnostics
+    print("\n📱 Inicializando Firebase...")
+    from app.core.firebase_admin_client import get_messaging_client
+    messaging = get_messaging_client()
+    if messaging:
+        print("✅ Firebase inicializado correctamente")
+    else:
+        print("⚠️  Firebase NO se pudo inicializar - las notificaciones no funcionarán")
+    
     # Importing models above registers all mapped tables in Base.metadata.
+    print("\n🗄️  Inicializando base de datos...")
     Base.metadata.create_all(bind=engine)
     apply_schema_updates()
+    print("✅ Base de datos lista")
+    
     db = SessionLocal()
     try:
         # run_seeds(db)
         InventarioService.sincronizar_stocks_iniciales(db=db)
         db.commit()
-    except Exception:
+        print("✅ Sincronización de stocks completada")
+    except Exception as e:
         db.rollback()
+        print(f"❌ Error en inicialización: {e}")
         raise
     finally:
         db.close()
+    
+    print("\n" + "="*80)
+    print("✅ SERVIDOR LISTO PARA RECIBIR CONEXIONES")
+    print("="*80 + "\n")
 
 
 @app.get("/")
