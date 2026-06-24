@@ -2,6 +2,7 @@
 import json
 import os
 import re
+import secrets
 from datetime import date
 from datetime import datetime
 from datetime import timedelta
@@ -15,6 +16,7 @@ from sqlalchemy.orm import Session
 from app.core.config import obtener_app_base_url
 from app.core.security import JWT_ALGORITHM
 from app.core.security import JWT_SECRET_KEY
+from app.models.clientes import Cliente
 from app.models.usuarios import Usuario
 from app.repositories.empresa_repository import EmpresaRepository
 from app.repositories.rol_repository import RolRepository
@@ -31,6 +33,22 @@ from app.utils.email_service import (
 
 class SucursalService:
     LIMITE_ILIMITADO = "sin limite"
+
+    @staticmethod
+    def _generar_codigo_cliente(db: Session) -> str:
+        for _ in range(20):
+            codigo = str(secrets.randbelow(9) + 1)
+            codigo += "".join(str(secrets.randbelow(10)) for _ in range(8))
+
+            existe = (
+                db.query(Cliente.id_cliente)
+                .filter(Cliente.codigo_cliente == codigo)
+                .first()
+            )
+            if existe is None:
+                return codigo
+
+        raise RuntimeError("No se pudo generar un codigo de cliente unico.")
 
     @staticmethod
     def _normalizar_limite_plan(valor, clave: str) -> int | None:
@@ -670,19 +688,15 @@ class SucursalService:
 
             # Crear registro en la tabla cliente asociado al usuario
             try:
-                cliente = ClienteRepository.crear_cliente(
-                    db=db,
-                    datos={
-                        "id_usuario": id_usuario,
-                        "id_categoria_cliente": None,
-                        "codigo_cliente": "CLI-TEMP",
-                        "saldo_credito": None,
-                        "limite_credito": None,
-                        "activo": True,
-                    },
+                cliente = Cliente(
+                    id_usuario=id_usuario,
+                    id_categoria_cliente=None,
+                    codigo_cliente=SucursalService._generar_codigo_cliente(db),
+                    saldo_credito=None,
+                    limite_credito=None,
+                    activo=True,
                 )
-                # Asignar codigo definitivo basado en id_cliente (3 dígitos)
-                cliente.codigo_cliente = f"CLI-{cliente.id_cliente:03d}"
+                db.add(cliente)
                 db.commit()
                 db.refresh(cliente)
             except Exception:

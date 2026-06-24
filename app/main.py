@@ -20,7 +20,7 @@ from app.models.empresas import (
 from app.models.inventario import MovimientoInventario, Stock, TipoMovimiento
 from app.models.productos import CategoriaProducto, Producto, SubcategoriaProducto
 from app.models.usuarios import Persona, Rol, Usuario, UsuarioRol, Modulo, Permiso, RolPermiso
-from app.models.ventas import CuentaPorCobrar, MetodoPago, PagoCredito, TipoVenta, Venta, VentaPago
+from app.models.ventas import CuentaPorCobrar, Factura, MetodoPago, PagoCredito, TipoVenta, Venta, VentaPago
 from app.routers.cliente_router import categoria_cliente_router, cliente_router
 from app.routers.empresa_router import router as empresa_router
 from app.routers.auth_router import router as auth_router
@@ -87,6 +87,11 @@ app.include_router(clientes_websocket_router)
 media_root = Path(__file__).resolve().parent / "media"
 media_root.mkdir(parents=True, exist_ok=True)
 app.mount("/media", StaticFiles(directory=media_root), name="media")
+
+xml_root = Path(__file__).resolve().parent / "XMLS"
+xml_root.mkdir(parents=True, exist_ok=True)
+(xml_root / "PDFS").mkdir(parents=True, exist_ok=True)
+app.mount("/XMLS", StaticFiles(directory=xml_root), name="xmls")
 
 @app.on_event("startup")
 def on_startup() -> None:

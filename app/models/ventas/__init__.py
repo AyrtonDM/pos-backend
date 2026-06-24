@@ -5,6 +5,7 @@ from app.models.ventas.venta_pago import VentaPago
 from app.models.ventas.detalle_venta import DetalleVenta
 from app.models.ventas.cuenta_por_cobrar import CuentaPorCobrar
 from app.models.ventas.pago_credito import PagoCredito
+from app.models.ventas.factura import Factura
 
 __all__ = [
 	"MetodoPago",
@@ -14,4 +15,5 @@ __all__ = [
 	"DetalleVenta",
 	"CuentaPorCobrar",
 	"PagoCredito",
+	"Factura",
 ]

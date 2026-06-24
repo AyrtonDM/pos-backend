@@ -8,6 +8,22 @@ def apply_schema_updates() -> None:
         connection.execute(
             text(
                 """
+                ALTER TABLE factura
+                ADD COLUMN IF NOT EXISTS iva NUMERIC(12, 2) NOT NULL DEFAULT 0.00
+                """
+            )
+        )
+        connection.execute(
+            text(
+                """
+                ALTER TABLE factura
+                ADD COLUMN IF NOT EXISTS pdf_generado TEXT NOT NULL DEFAULT ''
+                """
+            )
+        )
+        connection.execute(
+            text(
+                """
                 ALTER TABLE rol
                 ADD COLUMN IF NOT EXISTS tipo VARCHAR(50)
                 """
@@ -18,6 +34,48 @@ def apply_schema_updates() -> None:
                 """
                 ALTER TABLE rol
                 ADD COLUMN IF NOT EXISTS id_empresa INTEGER
+                """
+            )
+        )
+        connection.execute(
+            text(
+                """
+                DO $$
+                DECLARE
+                    constraint_name TEXT;
+                BEGIN
+                    FOR constraint_name IN
+                        SELECT con.conname
+                        FROM pg_constraint con
+                        JOIN pg_class rel ON rel.oid = con.conrelid
+                        JOIN pg_namespace nsp ON nsp.oid = rel.relnamespace
+                        WHERE rel.relname = 'rol'
+                          AND nsp.nspname = current_schema()
+                          AND con.contype = 'u'
+                          AND (
+                              SELECT array_agg(att.attname ORDER BY key_column.ordinality)
+                              FROM unnest(con.conkey) WITH ORDINALITY AS key_column(attnum, ordinality)
+                              JOIN pg_attribute att
+                                ON att.attrelid = rel.oid
+                               AND att.attnum = key_column.attnum
+                          ) = ARRAY['nombre']::name[]
+                    LOOP
+                        EXECUTE format(
+                            'ALTER TABLE rol DROP CONSTRAINT %I',
+                            constraint_name
+                        );
+                    END LOOP;
+
+                    IF NOT EXISTS (
+                        SELECT 1
+                        FROM pg_constraint
+                        WHERE conname = 'uq_rol_nombre_empresa'
+                    ) THEN
+                        ALTER TABLE rol
+                        ADD CONSTRAINT uq_rol_nombre_empresa
+                        UNIQUE (nombre, id_empresa);
+                    END IF;
+                END $$;
                 """
             )
         )
