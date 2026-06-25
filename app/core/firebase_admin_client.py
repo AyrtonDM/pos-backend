@@ -23,32 +23,36 @@ def get_messaging_client() -> Optional[Any]:
     try:
         _app = get_app()
     except ValueError:
-        # 1. Try to load from env variable containing raw JSON string (ideal for Render/cloud deployments)
+        # 🔥 1. PRIORIDAD TOTAL AL ARCHIVO FÍSICO QUE SUBISTE
+        cred_path = os.getenv("FIREBASE_SERVICE_ACCOUNT")
+        if not cred_path or not os.path.exists(cred_path):
+            cred_path = _find_service_account_in_secrets()
+        
+        # Si encontramos el archivo físico nuevo, lo usamos directamente
+        if cred_path and os.path.exists(cred_path):
+            try:
+                print(f"[FIREBASE] Inicializando desde archivo físico: {cred_path}")
+                cred = credentials.Certificate(cred_path)
+                _app = initialize_app(cred)
+                return messaging
+            except Exception as e:
+                print(f"[FIREBASE ERROR] Falló archivo físico, intentando fallback: {str(e)}")
+
+        # 2. FALLBACK (Si no hay archivo físico, intenta usar la variable de entorno en bruto)
         fcm_json_str = os.getenv("FIREBASE_SERVICE_ACCOUNT_JSON")
         if fcm_json_str:
             try:
                 import json
+                print("[FIREBASE] Inicializando desde FIREBASE_SERVICE_ACCOUNT_JSON")
                 cred_dict = json.loads(fcm_json_str)
                 cred = credentials.Certificate(cred_dict)
                 _app = initialize_app(cred)
                 return messaging
             except Exception as e:
                 print(f"[FIREBASE ERROR] Failed to initialize from FIREBASE_SERVICE_ACCOUNT_JSON: {str(e)}")
+                return None
                 
-        # 2. Fallback to file path
-        cred_path = os.getenv("FIREBASE_SERVICE_ACCOUNT")
-        if not cred_path or not os.path.exists(cred_path):
-            cred_path = _find_service_account_in_secrets()
-        
-        if not cred_path or not os.path.exists(cred_path):
-            print("[FIREBASE ERROR] Service account credentials not found (no file and no env JSON string)!")
-            return None
-        
-        try:
-            cred = credentials.Certificate(cred_path)
-            _app = initialize_app(cred)
-        except Exception as e:
-            print(f"[FIREBASE ERROR] Failed to initialize: {str(e)}")
-            return None
+        print("[FIREBASE ERROR] No se encontraron credenciales válidas en ningún lado.")
+        return None
     
     return messaging
