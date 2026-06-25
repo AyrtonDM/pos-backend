@@ -164,3 +164,12 @@ def diagnose_firebase() -> dict:
         "env_firebase_service_account_json_exists": os.getenv("FIREBASE_SERVICE_ACCOUNT_JSON") is not None
     }
 
+
+@app.get("/diagnose-fcm-logs")
+def diagnose_fcm_logs() -> dict:
+    from app.services.notification_service import fcm_logs
+    return {
+        "logs": fcm_logs
+    }
+
+
