@@ -132,3 +132,35 @@ def on_startup() -> None:
 @app.get("/")
 def healthcheck() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.get("/diagnose-firebase")
+def diagnose_firebase() -> dict:
+    import os
+    from pathlib import Path
+    from firebase_admin import get_app
+    
+    secrets_dir = Path(__file__).resolve().parent / "secrets"
+    secrets_exists = secrets_dir.exists()
+    secrets_files = []
+    if secrets_exists:
+        secrets_files = [p.name for p in secrets_dir.iterdir() if p.is_file()]
+        
+    firebase_initialized = False
+    init_error = None
+    try:
+        get_app()
+        firebase_initialized = True
+    except Exception as e:
+        init_error = str(e)
+        
+    return {
+        "firebase_initialized": firebase_initialized,
+        "init_error": init_error,
+        "secrets_dir_exists": secrets_exists,
+        "secrets_dir_path": str(secrets_dir),
+        "secrets_files": secrets_files,
+        "env_firebase_service_account": os.getenv("FIREBASE_SERVICE_ACCOUNT"),
+        "env_firebase_service_account_json_exists": os.getenv("FIREBASE_SERVICE_ACCOUNT_JSON") is not None
+    }
+
