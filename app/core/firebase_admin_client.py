@@ -2,7 +2,7 @@ import os
 from typing import Optional, Any
 from pathlib import Path
 
-from firebase_admin import credentials, initialize_app, messaging
+from firebase_admin import credentials, initialize_app, messaging, get_app
 
 _app = None
 
@@ -17,18 +17,25 @@ def _find_service_account_in_secrets() -> Optional[str]:
             return str(p)
     return None
 
-# def get_messaging_client() -> Optional[messaging]:
 
 def get_messaging_client() -> Optional[Any]:
     global _app
-    if _app is None:
+    try:
+        _app = get_app()
+    except ValueError:
         cred_path = os.getenv("FIREBASE_SERVICE_ACCOUNT")
         if not cred_path or not os.path.exists(cred_path):
             cred_path = _find_service_account_in_secrets()
+        
         if not cred_path or not os.path.exists(cred_path):
-            print("Firebase service account not found. Set FIREBASE_SERVICE_ACCOUNT or place JSON in app/secrets")
+            print("[FIREBASE ERROR] Service account credentials not found!")
             return None
-        cred = credentials.Certificate(cred_path)
-        _app = initialize_app(cred)
-        print(f"Initialized firebase-admin with {cred_path}")
+        
+        try:
+            cred = credentials.Certificate(cred_path)
+            _app = initialize_app(cred)
+        except Exception as e:
+            print(f"[FIREBASE ERROR] Failed to initialize: {str(e)}")
+            return None
+    
     return messaging

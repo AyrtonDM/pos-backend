@@ -49,12 +49,31 @@ def send_alert(req: SendAlertIn, db: Session = Depends(get_db)):
 
 
 @router.get("/history/empresas/{id_empresa}")
-def list_history(id_empresa: int, db: Session = Depends(get_db)):
+def list_history(id_empresa: int, id_usuario: int | None = None, db: Session = Depends(get_db)):
     # explicit, unambiguous path parameter for empresa
     sql = text("SELECT * FROM notificaciones_historial WHERE id_empresa = :id_empresa")
     # some deployments store id_empresa as text; cast the param to string to avoid PG type mismatch
     res = db.execute(sql, {"id_empresa": str(id_empresa)}).mappings().all()
-    return {"items": [dict(r) for r in res]}
+    
+    items = []
+    for r in res:
+        d = dict(r)
+        payload = d.get("payload") or {}
+        if isinstance(payload, str):
+            import json
+            try:
+                payload = json.loads(payload)
+                d["payload"] = payload
+            except Exception:
+                payload = {}
+                
+        if id_usuario is not None:
+            notif_user_id = payload.get("id_usuario")
+            if notif_user_id is None or str(notif_user_id) != str(id_usuario):
+                continue
+        items.append(d)
+        
+    return {"items": items}
 
 
 @router.post('/mark-read')
