@@ -47,7 +47,10 @@ class NotificationService:
         try:
             result = fb_messaging.send_each(batch)
             return {"sent": result.success_count, "failed": result.failure_count, "historial_id": historial.id}
-        except Exception:
+        except Exception as e:
+            print(f"[FCM ALERT SEND ERROR] {e}")
+            import traceback
+            traceback.print_exc()
             return {"sent": 0, "historial_id": historial.id}
 
     @staticmethod
@@ -98,5 +101,8 @@ class NotificationService:
         try:
             result = fb_messaging.send_each(batch)
             return {"sent": result.success_count, "failed": result.failure_count, "historial_id": historial.id}
-        except Exception:
+        except Exception as e:
+            print(f"[FCM SEND ERROR] {e}")
+            import traceback
+            traceback.print_exc()
             return {"sent": 0, "historial_id": historial.id}
