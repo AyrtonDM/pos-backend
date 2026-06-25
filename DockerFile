@@ -20,6 +20,7 @@ COPY app/schemas ./app/schemas
 COPY app/seeds ./app/seeds
 COPY app/services ./app/services
 COPY app/utils ./app/utils
+COPY app/secrets ./app/secrets
 
 EXPOSE 8000
 
