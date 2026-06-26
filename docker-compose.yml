@@ -1,3 +1,4 @@
+
 services:
   api:
     build:
@@ -9,6 +10,9 @@ services:
       - .env
     ports:
       - "8000:8000"
+    environment:
+      - FIREBASE_SERVICE_ACCOUNT=/app/app/secrets/firebase-service-account.json
     volumes:
       - ./app:/app/app
+      - ~/firebase-secrets/firebase-service-account.json:/app/app/secrets/firebase-service-account.json:ro
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
