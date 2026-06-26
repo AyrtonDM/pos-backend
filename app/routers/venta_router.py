@@ -67,6 +67,7 @@ def listar_metodos_pago(db: Session = Depends(get_db)):
 
 @venta_router.post("/sesiones/{id_caja_sesion}/ventas", response_model=VentaCreateResponse)
 def crear_venta(id_caja_sesion: int, datos: VentaCreate, db: Session = Depends(get_db), current_user: Usuario = Depends(get_current_user)):
+    print("[TRACE VENTA ROUTER] entro crear venta", flush=True)
     resultado = VentaService.crear_venta_completa(db=db, current_user=current_user, id_caja_sesion=id_caja_sesion, payload=datos)
     
     # Registrar en bitácora
@@ -113,15 +114,13 @@ def registrar_pago_credito(
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(get_current_user),
 ):
-    print("[TRACE ROUTER PAGO] entro", flush=True)
-    print("[TRACE ROUTER PAGO] llamando servicio", flush=True)
+    print("[TRACE COBRO ROUTER] entro pago credito", flush=True)
     resultado = VentaService.registrar_pago_cuenta_por_cobrar(
         db=db,
         current_user=current_user,
         id_caja_sesion=id_caja_sesion,
         payload=datos,
     )
-    print("[TRACE ROUTER PAGO] servicio terminado", flush=True)
 
     try:
         usuario_nombre = (

@@ -59,7 +59,6 @@ class NotificationService:
                         sound="default",
                         default_sound=True,
                         default_vibrate_timings=True,
-                        notification_priority=fb_messaging.AndroidNotificationPriority.PRIORITY_HIGH,
                     ),
                 ),
             )

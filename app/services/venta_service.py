@@ -29,6 +29,7 @@ class VentaService:
 
     @staticmethod
     def crear_venta_completa(db: Session, current_user, id_caja_sesion: int, payload) -> dict:
+        print("[TRACE VENTA SERVICE] inicio crear venta", flush=True)
         # Validar caja_sesion
         caja_sesion: CajaSesion | None = CajaRepository.obtener_caja_sesion_por_id(db, id_caja_sesion)
         if not caja_sesion:
@@ -261,6 +262,8 @@ class VentaService:
             if venta is None:
                 raise HTTPException(status_code=500, detail="No se pudo recuperar la venta creada.")
 
+            print(f"[TRACE VENTA SERVICE] venta guardada id={venta.id_venta}", flush=True)
+
             factura_email_enviado = None
             if factura is not None and ruta_pdf_factura is not None:
                 db.refresh(factura)
@@ -368,6 +371,7 @@ class VentaService:
         id_caja_sesion: int,
         payload,
     ) -> dict:
+        print("[TRACE COBRO SERVICE] inicio pago credito", flush=True)
         caja_sesion = CajaRepository.obtener_caja_sesion_por_id(
             db=db,
             id_caja_sesion=id_caja_sesion,
@@ -498,6 +502,8 @@ class VentaService:
                 db.refresh(pago)
             for movimiento in movimientos_creados:
                 db.refresh(movimiento)
+
+            print(f"[TRACE COBRO SERVICE] cobro guardado id={cuenta.id_cxc}", flush=True)
 
             # --- NOTIFICACIÓN PUSH REAL ---
             try:
