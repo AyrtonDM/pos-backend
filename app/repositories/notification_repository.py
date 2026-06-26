@@ -10,12 +10,27 @@ class NotificationRepository:
     def add_token(db: Session, token: str, uid_usuario: Optional[str] = None, rol: Optional[str] = None, plataforma: Optional[str] = None, id_empresa: Optional[int] = None):
         existing = db.query(DispositivoToken).filter(DispositivoToken.token == token).first()
         if existing:
+            existing.uid_usuario = uid_usuario
+            existing.rol = rol
+            existing.plataforma = plataforma
+            existing.id_empresa = id_empresa
+            db.commit()
+            db.refresh(existing)
             return existing
         obj = DispositivoToken(token=token, uid_usuario=uid_usuario, rol=rol, plataforma=plataforma, id_empresa=id_empresa)
         db.add(obj)
         db.commit()
         db.refresh(obj)
         return obj
+
+    @staticmethod
+    def delete_token(db: Session, token: str) -> bool:
+        obj = db.query(DispositivoToken).filter(DispositivoToken.token == token).first()
+        if obj:
+            db.delete(obj)
+            db.commit()
+            return True
+        return False
 
     @staticmethod
     def list_tokens_by_empresa(db: Session, id_empresa: int) -> List[DispositivoToken]:

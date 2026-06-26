@@ -11,33 +11,80 @@ class NotificationService:
         # Persist historial (guardado seguro: captura errores de DB y evita propagar excepciones)
         try:
             historial = NotificationRepository.save_historial(db, id_empresa=id_empresa, tipo="ALERTA", titulo=titulo, mensaje=mensaje, payload=payload or {})
-        except Exception:
-            # If persisting the historial fails, do not abort the caller flow; return a noop result.
+        except Exception as e:
+            print(f"[FCM] Error al guardar historial: {e}")
             return {"sent": 0, "historial_id": None}
 
-        # Prepare messages
-        tokens = tokens or [t.token for t in NotificationRepository.list_tokens_by_empresa(db, id_empresa)]
-        if not tokens:
+        # Prepare tokens
+        resolved_tokens = tokens or [t.token for t in NotificationRepository.list_tokens_by_empresa(db, id_empresa)]
+        print(f"[FCM] Tokens a notificar para empresa {id_empresa}: {len(resolved_tokens)}")
+        for idx, tok in enumerate(resolved_tokens):
+            print(f"[FCM]   Token[{idx}]: {tok[:25]}...")
+
+        if not resolved_tokens:
+            print(f"[FCM] Sin tokens registrados para empresa {id_empresa}. Push no enviado.")
             return {"sent": 0, "historial_id": historial.id}
 
         messaging = get_messaging_client()
-        if not messaging:
-            # no firebase credentials configured; skip actual send
-            return {"sent": 0, "historial_id": historial.id}
 
+        # Build data dict with all string values (FCM requires strings)
+        data_payload: Dict[str, str] = {}
+        if payload:
+            for k, v in payload.items():
+                data_payload[k] = str(v)
+
+        # Build batch with AndroidConfig for sound + high priority + channel
         batch = []
-        for t in tokens:
+        for t in resolved_tokens:
             msg = fb_messaging.Message(
                 token=t,
                 notification=fb_messaging.Notification(title=titulo, body=mensaje),
-                data={"payload": str(payload or {})},
+                data=data_payload,
+                android=fb_messaging.AndroidConfig(
+                    priority="high",
+                    notification=fb_messaging.AndroidNotification(
+                        channel_id="credit_payments_channel",
+                        sound="default",
+                        default_sound=True,
+                        default_vibrate_timings=True,
+                        notification_priority=fb_messaging.AndroidNotificationPriority.PRIORITY_HIGH,
+                    ),
+                ),
             )
             batch.append(msg)
 
-        # send_all expects a list of messages
         try:
             result = fb_messaging.send_all(batch)
-            # handle failures (could remove tokens) - simple count
+            print(f"[FCM] Firebase resultado → success={result.success_count}, failed={result.failure_count}")
+
+            for idx, response in enumerate(result.responses):
+                if not response.success:
+                    token_to_remove = resolved_tokens[idx]
+                    exc = response.exception
+                    print(f"[FCM] Fallo en token[{idx}] ({token_to_remove[:25]}...): {exc}")
+
+                    is_unregistered = False
+                    if exc:
+                        exc_code = getattr(exc, 'code', '') or ''
+                        exc_name = exc.__class__.__name__
+                        if (
+                            'unregistered' in exc_code.lower()
+                            or 'unregistered' in exc_name.lower()
+                            or exc_code == 'messaging/registration-token-not-registered'
+                            or 'invalid' in exc_code.lower()
+                            or 'invalid' in exc_name.lower()
+                        ):
+                            is_unregistered = True
+
+                    if is_unregistered:
+                        try:
+                            NotificationRepository.delete_token(db, token_to_remove)
+                            print(f"[FCM] Token obsoleto eliminado: {token_to_remove[:25]}...")
+                        except Exception as delete_err:
+                            print(f"[FCM] Error eliminando token obsoleto: {delete_err}")
+
             return {"sent": result.success_count, "failed": result.failure_count, "historial_id": historial.id}
-        except Exception:
+
+        except Exception as e:
+            print(f"[FCM] Error crítico en send_all: {e}")
             return {"sent": 0, "historial_id": historial.id}

@@ -19,15 +19,17 @@ def _find_service_account_in_secrets() -> Optional[str]:
 
 # def get_messaging_client() -> Optional[messaging]:
 
-def get_messaging_client() -> Optional[Any]:
+def get_messaging_client() -> Any:
     global _app
     if _app is None:
         cred_path = os.getenv("FIREBASE_SERVICE_ACCOUNT")
         if not cred_path or not os.path.exists(cred_path):
             cred_path = _find_service_account_in_secrets()
         if not cred_path or not os.path.exists(cred_path):
-            print("Firebase service account not found. Set FIREBASE_SERVICE_ACCOUNT or place JSON in app/secrets")
-            return None
+            raise ValueError(
+                "CRÍTICO: No se encontró el archivo de credenciales de Firebase. "
+                "Defina FIREBASE_SERVICE_ACCOUNT en el .env o coloque el archivo JSON en app/secrets"
+            )
         cred = credentials.Certificate(cred_path)
         _app = initialize_app(cred)
         print(f"Initialized firebase-admin with {cred_path}")
