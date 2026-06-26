@@ -256,30 +256,6 @@ class VentaService:
             # Commit transaction una vez todo creado
             db.commit()
 
-            # Notify the client about their new credit account
-            if es_venta_credito and cuenta_por_cobrar and cliente:
-                try:
-                    from app.models.empresas import Empresa
-                    from app.services.notification_service import NotificationService
-                    empresa = db.query(Empresa).filter(Empresa.id_empresa == caja_sesion.caja.sucursal.id_empresa).first()
-                    empresa_nombre = empresa.nombre if empresa else "la empresa"
-                    NotificationService.enviar_notificacion_usuario(
-                        db=db,
-                        id_usuario=cliente.id_usuario,
-                        id_empresa=caja_sesion.caja.sucursal.id_empresa,
-                        titulo="Nueva cuenta de crédito",
-                        mensaje=f"Se ha registrado una nueva cuenta de crédito por ${payload.total} en {empresa_nombre}. Vence el {cuenta_por_cobrar.fecha_vencimiento.strftime('%d/%m/%Y')}.",
-                        payload={
-                            "tipo": "NUEVO_CREDITO",
-                            "id_cxc": cuenta_por_cobrar.id_cxc,
-                            "id_venta": venta.id_venta,
-                            "monto_credito": float(payload.total)
-                        }
-                    )
-                except Exception as e:
-                    import logging
-                    logging.exception("Error al enviar notificacion de nueva cuenta de credito")
-
             # Recuperar la venta con sus detalles cargados para poder serializarla sin problemas
             venta = VentaRepository.obtener_venta_por_id(db=db, id_venta=venta.id_venta)
             if venta is None:
@@ -523,32 +499,45 @@ class VentaService:
             for movimiento in movimientos_creados:
                 db.refresh(movimiento)
 
-            # Notify the client about their payment
-            if cuenta and cuenta.venta and cuenta.venta.cliente:
-                try:
-                    from app.models.empresas import Empresa
-                    from app.services.notification_service import NotificationService
-                    id_empresa = caja_sesion.caja.sucursal.id_empresa
-                    empresa = db.query(Empresa).filter(Empresa.id_empresa == id_empresa).first()
-                    empresa_nombre = empresa.nombre if empresa else "la empresa"
-                    cliente = cuenta.venta.cliente
-                    NotificationService.enviar_notificacion_usuario(
-                        db=db,
-                        id_usuario=cliente.id_usuario,
-                        id_empresa=id_empresa,
-                        titulo="Pago de crédito registrado",
-                        mensaje=f"Se ha registrado un pago por ${total_pagado} a tu cuenta de crédito en {empresa_nombre}. Tu nuevo saldo pendiente es ${cuenta.saldo_pendiente}.",
-                        payload={
-                            "tipo": "PAGO_CREDITO",
-                            "id_cxc": cuenta.id_cxc,
-                            "id_venta": cuenta.venta.id_venta,
-                            "monto_pagado": float(total_pagado),
-                            "saldo_pendiente": float(cuenta.saldo_pendiente)
-                        }
-                    )
-                except Exception as e:
-                    import logging
-                    logging.exception("Error al enviar notificacion de pago de credito")
+            # --- NOTIFICACIÓN PUSH REAL ---
+            try:
+                if cuenta.venta and cuenta.venta.cliente:
+                    client_user_id = cuenta.venta.cliente.id_usuario
+                    print(f"[DEBUG FCM] client_user_id: {client_user_id}, id_empresa_cuenta: {id_empresa_cuenta}")
+                    if client_user_id:
+                        from app.models.notifications.notifications import DispositivoToken
+                        from app.services.notification_service import NotificationService
+                        
+                        client_tokens_query = db.query(DispositivoToken).filter(
+                            DispositivoToken.uid_usuario == str(client_user_id),
+                            DispositivoToken.id_empresa == id_empresa_cuenta
+                        ).all()
+                        client_tokens = [t.token for t in client_tokens_query]
+                        
+                        print(f"[DEBUG FCM] Cantidad de tokens encontrados: {len(client_tokens)}")
+                        for idx, tok in enumerate(client_tokens):
+                            print(f"[DEBUG FCM] Token {idx}: {tok[:20]}...")
+                        
+                        if client_tokens:
+                            notification_payload = {
+                                "id_cxc": str(cuenta.id_cxc),
+                                "id_empresa": str(id_empresa_cuenta),
+                                "id_usuario": str(client_user_id),
+                                "monto_pagado": str(total_pagado),
+                                "saldo_pendiente": str(cuenta.saldo_pendiente),
+                                "estado": cuenta.estado
+                            }
+                            res = NotificationService.enviar_alerta(
+                                db=db,
+                                id_empresa=id_empresa_cuenta,
+                                titulo="Abono de Crédito Registrado",
+                                mensaje=f"Se ha registrado un abono de {total_pagado} a tu crédito. Saldo pendiente: {cuenta.saldo_pendiente}.",
+                                payload=notification_payload,
+                                tokens=client_tokens
+                            )
+                            print(f"[DEBUG FCM] Resultado de Firebase: {res}")
+            except Exception as notif_err:
+                print(f"[DEBUG FCM] Error al enviar notificacion push de abono de credito: {notif_err}")
 
             return {
                 "id_cxc": cuenta.id_cxc,

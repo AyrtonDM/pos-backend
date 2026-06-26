@@ -27,7 +27,11 @@ class RegisterTokenIn(BaseModel):
 
 @router.post("/register-token")
 def register_token(payload: RegisterTokenIn, db: Session = Depends(get_db)):
-    obj = NotificationRepository.add_token(db=db, token=payload.token, uid_usuario=payload.uid_usuario, rol=payload.rol, plataforma=payload.plataforma, id_empresa=payload.id_empresa)
+    t = payload.token.strip()
+    if not t or t.lower() in ("null", "none", "mock", "mock_token") or t.lower().startswith("mock_token_"):
+        raise HTTPException(status_code=400, detail="Token FCM inválido o simulado")
+        
+    obj = NotificationRepository.add_token(db=db, token=t, uid_usuario=payload.uid_usuario, rol=payload.rol, plataforma=payload.plataforma, id_empresa=payload.id_empresa)
     return {"ok": True, "token_id": obj.id}
 
 
