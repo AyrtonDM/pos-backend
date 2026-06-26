@@ -273,6 +273,45 @@ class VentaService:
                     ruta_pdf=ruta_pdf_factura,
                 )
 
+            # --- NOTIFICACIÓN PUSH: nueva compra a crédito ---
+            if es_venta_credito and cuenta_por_cobrar is not None:
+                try:
+                    print("[TRACE VENTA] inicio notificacion push credito", flush=True)
+                    id_empresa_venta = caja_sesion.caja.sucursal.id_empresa
+                    client_user_id = None
+                    if cliente and getattr(cliente, "id_usuario", None):
+                        client_user_id = cliente.id_usuario
+                    print(f"[TRACE VENTA] client_user_id={client_user_id}", flush=True)
+
+                    if client_user_id:
+                        from app.services.notification_service import NotificationService
+                        total_fmt = f"{venta.total:.2f}"
+                        saldo_fmt = f"{cuenta_por_cobrar.saldo_pendiente:.2f}"
+                        notification_payload = {
+                            "id_cxc": str(cuenta_por_cobrar.id_cxc),
+                            "id_empresa": str(id_empresa_venta),
+                            "id_usuario": str(client_user_id),
+                            "monto_credito": str(cuenta_por_cobrar.monto_credito),
+                            "saldo_pendiente": str(cuenta_por_cobrar.saldo_pendiente),
+                            "estado": cuenta_por_cobrar.estado or "PENDIENTE",
+                        }
+                        print("[TRACE VENTA] antes enviar_notificacion_usuario", flush=True)
+                        resultado_fcm = NotificationService.enviar_notificacion_usuario(
+                            db=db,
+                            id_usuario=client_user_id,
+                            id_empresa=id_empresa_venta,
+                            titulo="Nueva compra registrada",
+                            mensaje=f"Se registr\u00f3 una nueva compra por Bs. {total_fmt}. Su saldo pendiente es de Bs. {saldo_fmt}.",
+                            payload=notification_payload,
+                        )
+                        print(f"[TRACE VENTA] resultado_fcm={resultado_fcm}", flush=True)
+                    else:
+                        print("[TRACE VENTA] client_user_id es nulo/falso — no se envia push", flush=True)
+                except Exception as notif_err:
+                    import traceback as _tb_venta
+                    print(f"[TRACE VENTA] EXCEPCION en bloque de notificacion: {notif_err}", flush=True)
+                    _tb_venta.print_exc()
+
             return {
                 "venta": venta,
                 "detalles": detalles_creados,
