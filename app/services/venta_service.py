@@ -501,41 +501,30 @@ class VentaService:
 
             # --- NOTIFICACIÓN PUSH REAL ---
             try:
+                print("[FCM COBRO] inicio", flush=True)
                 if cuenta.venta and cuenta.venta.cliente:
                     client_user_id = cuenta.venta.cliente.id_usuario
-                    print(f"[DEBUG FCM] client_user_id: {client_user_id}, id_empresa_cuenta: {id_empresa_cuenta}", flush=True)
+                    print(f"[FCM COBRO] client_user_id: {client_user_id}", flush=True)
+                    print(f"[FCM COBRO] id_empresa: {id_empresa_cuenta}", flush=True)
                     if client_user_id:
-                        from app.models.notifications.notifications import DispositivoToken
                         from app.services.notification_service import NotificationService
-                        
-                        client_tokens_query = db.query(DispositivoToken).filter(
-                            DispositivoToken.uid_usuario == str(client_user_id),
-                            DispositivoToken.id_empresa == id_empresa_cuenta
-                        ).all()
-                        client_tokens = [t.token for t in client_tokens_query]
-                        
-                        print(f"[DEBUG FCM] Cantidad de tokens encontrados: {len(client_tokens)}", flush=True)
-                        for idx, tok in enumerate(client_tokens):
-                            print(f"[DEBUG FCM] Token {idx}: {tok[:20]}...", flush=True)
-                        
-                        if client_tokens:
-                            notification_payload = {
-                                "id_cxc": str(cuenta.id_cxc),
-                                "id_empresa": str(id_empresa_cuenta),
-                                "id_usuario": str(client_user_id),
-                                "monto_pagado": str(total_pagado),
-                                "saldo_pendiente": str(cuenta.saldo_pendiente),
-                                "estado": cuenta.estado
-                            }
-                            res = NotificationService.enviar_alerta(
-                                db=db,
-                                id_empresa=id_empresa_cuenta,
-                                titulo="Abono de Crédito Registrado",
-                                mensaje=f"Se ha registrado un abono de {total_pagado} a tu crédito. Saldo pendiente: {cuenta.saldo_pendiente}.",
-                                payload=notification_payload,
-                                tokens=client_tokens
-                            )
-                            print(f"[DEBUG FCM] Resultado de Firebase: {res}", flush=True)
+                        notification_payload = {
+                            "id_cxc": str(cuenta.id_cxc),
+                            "id_empresa": str(id_empresa_cuenta),
+                            "id_usuario": str(client_user_id),
+                            "monto_pagado": str(total_pagado),
+                            "saldo_pendiente": str(cuenta.saldo_pendiente),
+                            "estado": cuenta.estado
+                        }
+                        print(f"[FCM COBRO] payload: {notification_payload}", flush=True)
+                        res = NotificationService.enviar_notificacion_usuario(
+                            db=db,
+                            id_usuario=client_user_id,
+                            id_empresa=id_empresa_cuenta,
+                            titulo="Abono de Crédito Registrado",
+                            mensaje=f"Se ha registrado un abono de {total_pagado} a tu crédito. Saldo pendiente: {cuenta.saldo_pendiente}.",
+                            payload=notification_payload
+                        )
             except Exception as notif_err:
                 print(f"[DEBUG FCM] Error al enviar notificacion push de abono de credito: {notif_err}", flush=True)
 
