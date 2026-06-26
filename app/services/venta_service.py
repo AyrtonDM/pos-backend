@@ -503,7 +503,7 @@ class VentaService:
             try:
                 if cuenta.venta and cuenta.venta.cliente:
                     client_user_id = cuenta.venta.cliente.id_usuario
-                    print(f"[DEBUG FCM] client_user_id: {client_user_id}, id_empresa_cuenta: {id_empresa_cuenta}")
+                    print(f"[DEBUG FCM] client_user_id: {client_user_id}, id_empresa_cuenta: {id_empresa_cuenta}", flush=True)
                     if client_user_id:
                         from app.models.notifications.notifications import DispositivoToken
                         from app.services.notification_service import NotificationService
@@ -514,9 +514,9 @@ class VentaService:
                         ).all()
                         client_tokens = [t.token for t in client_tokens_query]
                         
-                        print(f"[DEBUG FCM] Cantidad de tokens encontrados: {len(client_tokens)}")
+                        print(f"[DEBUG FCM] Cantidad de tokens encontrados: {len(client_tokens)}", flush=True)
                         for idx, tok in enumerate(client_tokens):
-                            print(f"[DEBUG FCM] Token {idx}: {tok[:20]}...")
+                            print(f"[DEBUG FCM] Token {idx}: {tok[:20]}...", flush=True)
                         
                         if client_tokens:
                             notification_payload = {
@@ -535,9 +535,9 @@ class VentaService:
                                 payload=notification_payload,
                                 tokens=client_tokens
                             )
-                            print(f"[DEBUG FCM] Resultado de Firebase: {res}")
+                            print(f"[DEBUG FCM] Resultado de Firebase: {res}", flush=True)
             except Exception as notif_err:
-                print(f"[DEBUG FCM] Error al enviar notificacion push de abono de credito: {notif_err}")
+                print(f"[DEBUG FCM] Error al enviar notificacion push de abono de credito: {notif_err}", flush=True)
 
             return {
                 "id_cxc": cuenta.id_cxc,
