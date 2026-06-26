@@ -501,32 +501,42 @@ class VentaService:
 
             # --- NOTIFICACIÓN PUSH REAL ---
             try:
-                print("[FCM COBRO] inicio", flush=True)
+                import traceback
+                print("[TRACE COBRO] inicio", flush=True)
+                print("[TRACE COBRO] pago confirmado", flush=True)
+                id_empresa_cuenta = cuenta.venta.caja_sesion.caja.sucursal.id_empresa
+                print(f"[TRACE COBRO] id_empresa_cuenta={id_empresa_cuenta}", flush=True)
+                
+                client_user_id = None
                 if cuenta.venta and cuenta.venta.cliente:
                     client_user_id = cuenta.venta.cliente.id_usuario
-                    print(f"[FCM COBRO] client_user_id: {client_user_id}", flush=True)
-                    print(f"[FCM COBRO] id_empresa: {id_empresa_cuenta}", flush=True)
-                    if client_user_id:
-                        from app.services.notification_service import NotificationService
-                        notification_payload = {
-                            "id_cxc": str(cuenta.id_cxc),
-                            "id_empresa": str(id_empresa_cuenta),
-                            "id_usuario": str(client_user_id),
-                            "monto_pagado": str(total_pagado),
-                            "saldo_pendiente": str(cuenta.saldo_pendiente),
-                            "estado": cuenta.estado
-                        }
-                        print(f"[FCM COBRO] payload: {notification_payload}", flush=True)
-                        res = NotificationService.enviar_notificacion_usuario(
-                            db=db,
-                            id_usuario=client_user_id,
-                            id_empresa=id_empresa_cuenta,
-                            titulo="Abono de Crédito Registrado",
-                            mensaje=f"Se ha registrado un abono de {total_pagado} a tu crédito. Saldo pendiente: {cuenta.saldo_pendiente}.",
-                            payload=notification_payload
-                        )
+                print(f"[TRACE COBRO] client_user_id={client_user_id}", flush=True)
+
+                if client_user_id:
+                    from app.services.notification_service import NotificationService
+                    notification_payload = {
+                        "id_cxc": str(cuenta.id_cxc),
+                        "id_empresa": str(id_empresa_cuenta),
+                        "id_usuario": str(client_user_id),
+                        "monto_pagado": str(total_pagado),
+                        "saldo_pendiente": str(cuenta.saldo_pendiente),
+                        "estado": cuenta.estado
+                    }
+                    print("[TRACE COBRO] antes enviar_notificacion_usuario", flush=True)
+                    resultado_fcm = NotificationService.enviar_notificacion_usuario(
+                        db=db,
+                        id_usuario=client_user_id,
+                        id_empresa=id_empresa_cuenta,
+                        titulo="Abono de Crédito Registrado",
+                        mensaje=f"Se ha registrado un abono de {total_pagado} a tu crédito. Saldo pendiente: {cuenta.saldo_pendiente}.",
+                        payload=notification_payload
+                    )
+                    print(f"[TRACE COBRO] resultado_fcm={resultado_fcm}", flush=True)
+                else:
+                    print("[TRACE COBRO] client_user_id es nulo/falso — no se envía push", flush=True)
             except Exception as notif_err:
-                print(f"[DEBUG FCM] Error al enviar notificacion push de abono de credito: {notif_err}", flush=True)
+                print(f"[TRACE COBRO] EXCEPCION en bloque de notificacion: {notif_err}", flush=True)
+                traceback.print_exc()
 
             return {
                 "id_cxc": cuenta.id_cxc,

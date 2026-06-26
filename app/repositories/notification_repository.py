@@ -40,15 +40,19 @@ class NotificationRepository:
     def save_historial(db: Session, **data) -> NotificacionHistorial:
         # Use a dedicated short-lived session for historial so failures
         # here don't abort the caller's transaction.
+        import traceback as _tb
+        print("[TRACE REPO] save_historial llamado", flush=True)
         session = SessionLocal()
         try:
             obj = NotificacionHistorial(**data)
             session.add(obj)
             session.commit()
             session.refresh(obj)
+            print(f"[TRACE REPO] historial guardado id={obj.id}", flush=True)
             return obj
         except Exception:
             session.rollback()
+            _tb.print_exc()
             raise
         finally:
             session.close()

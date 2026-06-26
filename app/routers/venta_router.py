@@ -113,12 +113,15 @@ def registrar_pago_credito(
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(get_current_user),
 ):
+    print("[TRACE ROUTER PAGO] entro", flush=True)
+    print("[TRACE ROUTER PAGO] llamando servicio", flush=True)
     resultado = VentaService.registrar_pago_cuenta_por_cobrar(
         db=db,
         current_user=current_user,
         id_caja_sesion=id_caja_sesion,
         payload=datos,
     )
+    print("[TRACE ROUTER PAGO] servicio terminado", flush=True)
 
     try:
         usuario_nombre = (
