@@ -4,6 +4,7 @@ from app.services.inventario_service import InventarioService
 from app.services.producto_service import ProductoService
 from app.services.sucursal_service import SucursalService
 from app.services.usuario_service import UsuarioService
+from app.services.configuracion_sistema_service import ConfiguracionSistemaService
 
 __all__ = [
 	"ClienteService",
@@ -12,4 +13,6 @@ __all__ = [
 	"SucursalService",
 	"UsuarioService",
 	"ProductoService",
+	"ConfiguracionSistemaService",
 ]
+

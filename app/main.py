@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -39,6 +40,7 @@ from app.routers.sucursal_router import (
 from app.routers.notifications_router import router as notifications_router
 from app.routers.pago_router import router as pago_router
 from app.routers.plan_router import router as plan_router
+from app.routers.configuracion_sistema_router import router as configuracion_sistema_router
 from app.seeds import run_seeds
 from app.services.inventario_service import InventarioService
 from app.websockets.administrador import router as administrador_websocket_router
@@ -81,6 +83,7 @@ app.include_router(notifications_router)
 app.include_router(reportes_router)
 app.include_router(pago_router)
 app.include_router(plan_router)
+app.include_router(configuracion_sistema_router)
 app.include_router(administrador_websocket_router)
 app.include_router(clientes_websocket_router)
 
@@ -112,14 +115,15 @@ def on_startup() -> None:
     except Exception as e:
         pass
         
-    try:
-        apply_schema_updates()
-    except Exception as e:
-        pass
+    if os.getenv("RUN_SCHEMA_UPDATES", "false").lower() == "true":
+        try:
+            apply_schema_updates()
+        except Exception as e:
+            pass
     
     db = SessionLocal()
     try:
-        # run_seeds(db)
+        run_seeds(db)
         InventarioService.sincronizar_stocks_iniciales(db=db)
         db.commit()
     except Exception as e:

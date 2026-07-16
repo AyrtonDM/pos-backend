@@ -7,7 +7,7 @@ from app.seeds.roles_seed import seed_roles
 from app.seeds.tipo_movimiento_caja_seed import seed_tipos_movimiento_caja
 from app.seeds.tipo_movimiento_seed import seed_tipos_movimiento
 from app.seeds.tipo_venta_seed import seed_tipos_venta
-
+from app.seeds.plan_seed import seed_planes
 
 def run_seeds(db=None) -> None:
     own_session = db is None
@@ -21,6 +21,7 @@ def run_seeds(db=None) -> None:
         seed_tipos_movimiento_caja(db)
         seed_tipos_movimiento(db)
         seed_tipos_venta(db)
+        seed_planes(db)
         if own_session:
             db.commit()
     except Exception:

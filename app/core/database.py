@@ -17,20 +17,27 @@ DATABASE_URL = f"postgresql+psycopg2://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_POR
 Base = declarative_base()
 
 
+is_remote = DB_HOST not in ("localhost", "127.0.0.1", "db")
+
+connect_args = {
+    "connect_timeout": 15,
+    "keepalives": 1,
+    "keepalives_idle": 30,
+    "keepalives_interval": 10,
+    "keepalives_count": 5,
+}
+
+if is_remote:
+    connect_args["sslmode"] = "require"
+
 engine = create_engine(
     DATABASE_URL,
     echo=False,
     pool_pre_ping=True,
-    pool_recycle=180,
+    pool_recycle=300,
     pool_size=5,
     max_overflow=10,
     pool_timeout=30,
-    connect_args={
-        "connect_timeout": 10,
-        "keepalives": 1,
-        "keepalives_idle": 30,
-        "keepalives_interval": 10,
-        "keepalives_count": 5,
-    },
+    connect_args=connect_args,
 )
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
