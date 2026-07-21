@@ -1,20 +1,23 @@
-from pathlib import Path
 from uuid import uuid4
-
 from fastapi import UploadFile
+import cloudinary
+import cloudinary.uploader
+import os
 
+# We don't need to manually configure cloudinary here if CLOUDINARY_URL is in the environment
+# since the cloudinary SDK automatically picks it up, but it's good practice to ensure it's loaded.
 
 def save_product_image(file: UploadFile) -> str:
-    media_root = Path(__file__).resolve().parent.parent / "media"
-    relative_dir = Path("products")
-    target_dir = media_root / relative_dir
-    target_dir.mkdir(parents=True, exist_ok=True)
-
-    suffix = Path(file.filename or "").suffix.lower() or ".jpg"
-    filename = f"{uuid4().hex}{suffix}"
-    target_path = target_dir / filename
-
-    with target_path.open("wb") as out:
-        out.write(file.file.read())
-
-    return f"/media/{(relative_dir / filename).as_posix()}"
+    suffix = (file.filename or "").split('.')[-1] if '.' in (file.filename or "") else "jpg"
+    filename = f"products/{uuid4().hex}"
+    
+    # We must reset the file pointer just in case it was read
+    file.file.seek(0)
+    
+    response = cloudinary.uploader.upload(
+        file.file,
+        public_id=filename,
+        folder="pos_si2"
+    )
+    
+    return response.get("secure_url")
