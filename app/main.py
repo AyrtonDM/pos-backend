@@ -54,7 +54,7 @@ app = FastAPI(title="POS Backend")
 origins = [
     "http://localhost:4200",
     "http://127.0.0.1:4200",
-    "https://pos-frontend.duckdns.org"
+    "https://pos-frontend-si2.duckdns.org"
 ]
 
 app.add_middleware(
