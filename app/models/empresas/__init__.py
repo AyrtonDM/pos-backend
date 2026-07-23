@@ -8,6 +8,7 @@ from app.models.empresas.plan import Plan
 from app.models.empresas.plan_modulo import PlanModulo
 from app.models.empresas.sucursal import Sucursal
 from app.models.empresas.tipo_movimiento_caja import TipoMovimientoCaja
+from app.models.empresas.configuracion_sistema import ConfiguracionSistema
 
 __all__ = [
 	"Caja",
@@ -20,4 +21,6 @@ __all__ = [
 	"MovimientoCaja",
 	"Sucursal",
 	"TipoMovimientoCaja",
+	"ConfiguracionSistema",
 ]
+

@@ -4,6 +4,7 @@ from app.repositories.inventario_repository import InventarioRepository
 from app.repositories.producto_repository import ProductoRepository
 from app.repositories.sucursal_repository import SucursalRepository
 from app.repositories.usuario_repository import UsuarioRepository
+from app.repositories.configuracion_sistema_repository import ConfiguracionSistemaRepository
 
 __all__ = [
 	"ClienteRepository",
@@ -12,4 +13,6 @@ __all__ = [
 	"SucursalRepository",
 	"UsuarioRepository",
 	"ProductoRepository",
+	"ConfiguracionSistemaRepository",
 ]
+

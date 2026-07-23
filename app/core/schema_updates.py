@@ -1,4 +1,11 @@
 from sqlalchemy import text
+from sqlalchemy.exc import DBAPIError, OperationalError
+try:
+    from psycopg2.errors import DeadlockDetected, LockNotAvailable
+except ImportError:
+    DeadlockDetected = None
+    LockNotAvailable = None
+
 from app.core.database import engine
 
 def apply_schema_updates() -> None:
@@ -309,6 +316,27 @@ def apply_schema_updates() -> None:
                 UNIQUE (stripe_session_id);
             END IF;
         END $$;
+        """,
+        # 27. configuracion_sistema table
+        """
+        CREATE TABLE IF NOT EXISTS configuracion_sistema (
+            id_configuracion SERIAL PRIMARY KEY,
+            id_empresa INTEGER NOT NULL UNIQUE,
+            tema VARCHAR(50) NOT NULL DEFAULT 'claro',
+            idioma VARCHAR(10) NOT NULL DEFAULT 'es',
+            zona_horaria VARCHAR(100) NOT NULL DEFAULT 'America/La_Paz',
+            moneda VARCHAR(20) NOT NULL DEFAULT 'BOB',
+            activar_notificaciones_push BOOLEAN NOT NULL DEFAULT TRUE,
+            activar_sonido BOOLEAN NOT NULL DEFAULT TRUE,
+            activar_vibracion BOOLEAN NOT NULL DEFAULT TRUE,
+            confirmar_antes_de_eliminar BOOLEAN NOT NULL DEFAULT TRUE,
+            cerrar_sesion_por_inactividad BOOLEAN NOT NULL DEFAULT FALSE,
+            minutos_inactividad INTEGER NOT NULL DEFAULT 15,
+            imprimir_automaticamente BOOLEAN NOT NULL DEFAULT FALSE,
+            numero_copias INTEGER NOT NULL DEFAULT 1,
+            tamano_ticket VARCHAR(50) NOT NULL DEFAULT '80mm',
+            CONSTRAINT fk_configuracion_sistema_empresa FOREIGN KEY (id_empresa) REFERENCES empresa(id_empresa) ON DELETE CASCADE
+        )
         """
     ]
 
@@ -316,6 +344,18 @@ def apply_schema_updates() -> None:
         try:
             with engine.begin() as connection:
                 connection.execute(text(stmt))
-        except Exception as e:
+        except OperationalError as e:
             query_preview = stmt.strip().split("\n")[0][:60]
-            print(f"[SCHEMA WARNING] Ignored deadlock/lock error: {query_preview}... Error: {e}")
+            print(f"[SCHEMA CONNECTION ERROR] Connection error: {query_preview}... Error: {e}")
+            raise
+        except DBAPIError as e:
+            query_preview = stmt.strip().split("\n")[0][:60]
+            orig = getattr(e, "orig", None)
+            sqlstate = getattr(orig, "pgcode", None)
+            
+            if sqlstate == "40P01" or (DeadlockDetected is not None and isinstance(orig, DeadlockDetected)):
+                print(f"[SCHEMA DEADLOCK] Deadlock detected: {query_preview}... Error: {e}")
+            elif sqlstate == "55P03" or (LockNotAvailable is not None and isinstance(orig, LockNotAvailable)):
+                print(f"[SCHEMA LOCK NOT AVAILABLE] Lock not available: {query_preview}... Error: {e}")
+            else:
+                raise

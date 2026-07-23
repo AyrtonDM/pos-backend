@@ -23,3 +23,7 @@ SMTP_USER=ayrtondazamiranda@gmail.com
 SMTP_PASSWORD=bfdl wuka flgc qvpa
 SMTP_USE_TLS=true
 MAIL_FROM=ayrtondazamiranda@gmail.com
+
+
+CORS_ORIGINS=https://pos-frontend-si2.duckdns.org,http://localhost:4200,http://localhost:5173,http://localhost:3000,http://localhost:4201
+FRONTEND_BASE_URL=https://pos-frontend-si2.duckdns.org

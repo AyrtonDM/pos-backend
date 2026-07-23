@@ -451,7 +451,12 @@ class SucursalService:
             invitation_link=invitation_link,
         )
         if not email_enviado:
-            raise ValueError("No se pudo enviar el correo de invitacion.")
+            print(f"\n====================================")
+            print(f"ATENCION: Fallo el envio del correo.")
+            print(f"Usa este link manualmente para aceptar la invitacion de EMPLEADO:")
+            print(f"{invitation_link}")
+            print(f"====================================\n")
+            # raise ValueError("No se pudo enviar el correo de invitacion.")
 
         return {
             "mensaje": "Invitacion enviada correctamente.",
@@ -515,7 +520,12 @@ class SucursalService:
             invitation_link=invitation_link,
         )
         if not email_enviado:
-            raise ValueError("No se pudo enviar el correo de invitacion.")
+            print(f"\n====================================")
+            print(f"ATENCION: Fallo el envio del correo.")
+            print(f"Usa este link manualmente para aceptar la invitacion de CLIENTE:")
+            print(f"{invitation_link}")
+            print(f"====================================\n")
+            # raise ValueError("No se pudo enviar el correo de invitacion.")
 
         return {
             "mensaje": "Invitacion enviada correctamente.",

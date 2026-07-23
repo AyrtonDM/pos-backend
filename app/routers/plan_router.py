@@ -19,10 +19,15 @@ def get_db():
 
 @router.get("", response_model=list[PlanResponse])
 def listar_planes(db: Session = Depends(get_db)):
-    """
-    Obtiene la lista de todos los planes de suscripción disponibles.
-    """
     try:
-        return PlanService.listar_planes(db=db)
-    except Exception:
-        raise HTTPException(status_code=500, detail="Error al listar los planes.")
+        planes = PlanService.listar_planes(db=db)
+        print(f"[PLANES] encontrados={len(planes)}", flush=True)
+        return planes
+    except Exception as e:
+        import traceback
+        print(f"[PLANES ERROR] {e}", flush=True)
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error al listar los planes: {str(e)}"
+        )
