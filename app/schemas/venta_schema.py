@@ -53,6 +53,7 @@ class VentaCreate(BaseModel):
     id_tipo_venta: int
     id_cliente: int | None = None
     id_metodo_pago: int | None = None
+    id_pedido: int | None = None
     factura_linea: bool = False
     pagos: List[VentaPagoCreate] | None = None
     subtotal: Decimal
@@ -60,6 +61,7 @@ class VentaCreate(BaseModel):
     total: Decimal
     estado: str | None = "Pendiente"
     detalles: List[DetalleVentaCreate]
+
 
 
 class DetalleVentaResponse(DetalleVentaCreate):

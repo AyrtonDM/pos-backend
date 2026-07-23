@@ -105,6 +105,24 @@ class VentaService:
                     detail="Para generar factura en linea debe seleccionar un cliente.",
                 )
 
+            # Validar pedido si se provee
+            pedido_obj = None
+            if getattr(payload, "id_pedido", None) is not None:
+                from app.models.ventas.pedido_cliente import PedidoCliente
+                pedido_obj = db.query(PedidoCliente).filter(PedidoCliente.id_pedido == payload.id_pedido).first()
+                if not pedido_obj:
+                    raise HTTPException(status_code=404, detail="Pedido no encontrado.")
+                
+                # Validaciones del pedido
+                if pedido_obj.id_empresa != caja_sesion.caja.sucursal.id_empresa:
+                    raise HTTPException(status_code=400, detail="El pedido no pertenece a la empresa de esta caja.")
+                if pedido_obj.id_sucursal != caja_sesion.caja.id_sucursal:
+                    raise HTTPException(status_code=400, detail="El pedido no pertenece a la sucursal de esta caja.")
+                if pedido_obj.id_venta is not None:
+                    raise HTTPException(status_code=409, detail="El pedido ya fue convertido en venta.")
+                if pedido_obj.estado not in ["listo_para_recoger"]:
+                    raise HTTPException(status_code=400, detail=f"El pedido debe estar 'listo_para_recoger' para ser facturado. Estado actual: {pedido_obj.estado}")
+
             # Normalizar el estado a los valores permitidos por la DB
             estado_input = getattr(payload, "estado", None)
             map_estado = {
@@ -138,8 +156,15 @@ class VentaService:
                 "total": payload.total,
                 "fecha": datetime.utcnow(),
                 "estado": estado_norm,
+                "id_pedido": payload.id_pedido if getattr(payload, "id_pedido", None) is not None else None
             }
             venta = VentaRepository.crear_venta(db, venta_datos)
+
+            # Si existia pedido, actualizar su estado y relacion de venta
+            if pedido_obj:
+                pedido_obj.id_venta = venta.id_venta
+                pedido_obj.estado = "convertido_en_venta"
+                db.flush()
 
             detalles_creados = []
             detalles_factura = []
@@ -256,6 +281,18 @@ class VentaService:
 
             # Commit transaction una vez todo creado
             db.commit()
+
+            # Enviar FCM de conversión de pedido si existía
+            if pedido_obj:
+                try:
+                    from app.services.notification_service import NotificationService
+                    NotificationService.notificar_cambio_estado_pedido(
+                        db=db,
+                        pedido=pedido_obj,
+                        estado_nuevo="convertido_en_venta"
+                    )
+                except Exception:
+                    pass
 
             # Recuperar la venta con sus detalles cargados para poder serializarla sin problemas
             venta = VentaRepository.obtener_venta_por_id(db=db, id_venta=venta.id_venta)

@@ -21,7 +21,7 @@ from app.models.empresas import (
 from app.models.inventario import MovimientoInventario, Stock, TipoMovimiento
 from app.models.productos import CategoriaProducto, Producto, SubcategoriaProducto
 from app.models.usuarios import Persona, Rol, Usuario, UsuarioRol, Modulo, Permiso, RolPermiso
-from app.models.ventas import CuentaPorCobrar, Factura, MetodoPago, PagoCredito, TipoVenta, Venta, VentaPago
+from app.models.ventas import CuentaPorCobrar, Factura, MetodoPago, PagoCredito, TipoVenta, Venta, VentaPago, PedidoCliente, PedidoClienteDetalle
 from app.routers.cliente_router import categoria_cliente_router, cliente_router
 from app.routers.empresa_router import router as empresa_router
 from app.routers.auth_router import router as auth_router
@@ -41,6 +41,7 @@ from app.routers.notifications_router import router as notifications_router
 from app.routers.pago_router import router as pago_router
 from app.routers.plan_router import router as plan_router
 from app.routers.configuracion_sistema_router import router as configuracion_sistema_router
+from app.routers.pedido_router import pedido_router
 from app.seeds import run_seeds
 from app.services.inventario_service import InventarioService
 from app.websockets.administrador import router as administrador_websocket_router
@@ -84,6 +85,7 @@ app.include_router(reportes_router)
 app.include_router(pago_router)
 app.include_router(plan_router)
 app.include_router(configuracion_sistema_router)
+app.include_router(pedido_router)
 app.include_router(administrador_websocket_router)
 app.include_router(clientes_websocket_router)
 

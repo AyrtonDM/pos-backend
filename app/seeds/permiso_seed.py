@@ -46,6 +46,8 @@ DEFAULT_PERMISOS = [
     ("REPORTES", "REPORTE_GENERAR", "Generar reportes"),
     ("REPORTES", "REPORTE_EXPORTAR", "Exportar reportes"),
     ("REPORTES", "DASHBOARD_VER", "Ver dashboard"),
+    ("PEDIDOS", "PEDIDO_VER", "Ver pedidos de clientes"),
+    ("PEDIDOS", "PEDIDO_GESTIONAR", "Gestionar pedidos de clientes"),
 ]
 
 

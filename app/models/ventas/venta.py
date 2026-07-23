@@ -15,6 +15,8 @@ class Venta(Base):
     id_cliente = Column(ForeignKey("cliente.id_cliente"), nullable=True, index=True)
     id_caja_sesion = Column(ForeignKey("caja_sesion.id_caja_sesion"), nullable=False, index=True)
     id_usuario = Column(ForeignKey("usuario.id_usuario"), nullable=False, index=True)
+    id_pedido = Column(ForeignKey("pedido_cliente.id_pedido"), nullable=True, index=True)
+
 
     subtotal = Column(Numeric(12, 2), default=Decimal("0.00"), nullable=False)
     descuento_total = Column(Numeric(12, 2), default=Decimal("0.00"), nullable=False)

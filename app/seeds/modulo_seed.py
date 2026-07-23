@@ -12,6 +12,7 @@ DEFAULT_MODULOS = [
     {"codigo": "CLIENTES", "nombre": "Gestion de Clientes"},
     {"codigo": "CAJAS", "nombre": "Gestion de Cajas"},
     {"codigo": "REPORTES", "nombre": "Gestion de Reportes"},
+    {"codigo": "PEDIDOS", "nombre": "Gestion de Pedidos Mayoristas"},
 ]
 
 

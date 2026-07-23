@@ -6,6 +6,8 @@ from app.models.ventas.detalle_venta import DetalleVenta
 from app.models.ventas.cuenta_por_cobrar import CuentaPorCobrar
 from app.models.ventas.pago_credito import PagoCredito
 from app.models.ventas.factura import Factura
+from app.models.ventas.pedido_cliente import PedidoCliente
+from app.models.ventas.pedido_cliente_detalle import PedidoClienteDetalle
 
 __all__ = [
 	"MetodoPago",
@@ -16,4 +18,7 @@ __all__ = [
 	"CuentaPorCobrar",
 	"PagoCredito",
 	"Factura",
+	"PedidoCliente",
+	"PedidoClienteDetalle",
 ]
+
