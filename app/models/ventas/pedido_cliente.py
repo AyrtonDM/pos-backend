@@ -32,9 +32,10 @@ class PedidoCliente(Base):
     empresa = relationship("Empresa", backref="pedidos_cliente")
     sucursal = relationship("Sucursal", backref="pedidos_cliente")
     cliente = relationship("Cliente", backref="pedidos_cliente")
-    venta = relationship("Venta", backref="pedido_origen")
+    venta = relationship("Venta", back_populates="pedido", foreign_keys="[Venta.id_pedido]", uselist=False)
     detalles = relationship(
         "PedidoClienteDetalle",
         back_populates="pedido",
         cascade="all, delete-orphan",
     )
+

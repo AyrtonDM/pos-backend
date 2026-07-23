@@ -28,9 +28,11 @@ class Venta(Base):
     cliente = relationship("Cliente", back_populates="ventas")
     caja_sesion = relationship("CajaSesion", back_populates="ventas")
     usuario = relationship("Usuario", back_populates="ventas")
+    pedido = relationship("PedidoCliente", back_populates="venta", foreign_keys=[id_pedido])
     pagos = relationship("VentaPago", back_populates="venta", cascade="all, delete-orphan")
     detalles = relationship("DetalleVenta", back_populates="venta", cascade="all, delete-orphan")
     cuentas_por_cobrar = relationship("CuentaPorCobrar", back_populates="venta", cascade="all, delete-orphan")
+
     factura = relationship(
         "Factura",
         back_populates="venta",

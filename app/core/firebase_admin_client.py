@@ -36,8 +36,8 @@ def get_messaging_client() -> Optional[Any]:
     cred_path = os.getenv("FIREBASE_SERVICE_ACCOUNT")
     if cred_path:
         print(f"[FCM] FIREBASE_SERVICE_ACCOUNT apunta a: {cred_path}", flush=True)
-        if not os.path.exists(cred_path):
-            print(f"[FCM] ADVERTENCIA: el archivo indicado por FIREBASE_SERVICE_ACCOUNT NO existe: {cred_path}", flush=True)
+        if not os.path.isfile(cred_path):
+            print(f"[FCM] ADVERTENCIA: el archivo indicado por FIREBASE_SERVICE_ACCOUNT NO existe o es un directorio: {cred_path}", flush=True)
             cred_path = None
     else:
         print("[FCM] Variable FIREBASE_SERVICE_ACCOUNT no definida.", flush=True)
@@ -47,8 +47,8 @@ def get_messaging_client() -> Optional[Any]:
         cred_path = os.getenv("FIREBASE_CREDENTIALS_PATH")
         if cred_path:
             print(f"[FCM] FIREBASE_CREDENTIALS_PATH apunta a: {cred_path}", flush=True)
-            if not os.path.exists(cred_path):
-                print(f"[FCM] ADVERTENCIA: el archivo indicado por FIREBASE_CREDENTIALS_PATH NO existe: {cred_path}", flush=True)
+            if not os.path.isfile(cred_path):
+                print(f"[FCM] ADVERTENCIA: el archivo indicado por FIREBASE_CREDENTIALS_PATH NO existe o es un directorio: {cred_path}", flush=True)
                 cred_path = None
         else:
             print("[FCM] Variable FIREBASE_CREDENTIALS_PATH no definida.", flush=True)
@@ -57,7 +57,8 @@ def get_messaging_client() -> Optional[Any]:
     if not cred_path:
         cred_path = _find_service_account_in_secrets()
 
-    if not cred_path or not os.path.exists(cred_path):
+    if not cred_path or not os.path.isfile(cred_path):
+
         print(
             "[FCM] No se encontró ningún archivo de credenciales de Firebase. "
             "Las notificaciones push FCM no se enviarán. "
